@@ -44,18 +44,18 @@ export function PhotoCanvas({
   const templateImage = useImageElement(template.file);
   const thumbnailImage = useImageElement(template.thumbnail);
   const maskImage = useImageElement(template.mask);
-  const overlayImage = useImageElement(template.overlay);
   const userImage = useImageElement(userPhoto);
 
   const displayTemplateImage = templateImage ?? thumbnailImage;
+  const templateReady = Boolean(templateImage && maskImage);
 
   const size = useMemo(() => {
-    const sourceImage = maskImage ?? templateImage ?? overlayImage ?? thumbnailImage;
+    const sourceImage = maskImage ?? templateImage ?? thumbnailImage;
     return {
       width: sourceImage?.naturalWidth ?? 1030,
       height: sourceImage?.naturalHeight ?? 681
     };
-  }, [maskImage, templateImage, overlayImage, thumbnailImage]);
+  }, [maskImage, templateImage, thumbnailImage]);
 
   const displayScale = displayWidth / size.width;
   const displayHeight = size.height * displayScale;
@@ -94,7 +94,7 @@ export function PhotoCanvas({
     return () => {
       imageNode.clearCache();
     };
-  }, [userImage]);
+  }, [userImage, templateReady, template.id, adjustments.brightness, adjustments.contrast, adjustments.saturation, adjustments.hue]);
 
   useEffect(() => {
     if (!userImage) {
@@ -184,7 +184,7 @@ export function PhotoCanvas({
             {displayTemplateImage ? <KonvaImage image={displayTemplateImage} width={size.width} height={size.height} /> : null}
           </Layer>
           <Layer scaleX={displayScale} scaleY={displayScale}>
-            {userImage && maskImage ? (
+            {userImage && templateReady ? (
               <Group>
                 <KonvaImage
                   ref={userImageRef}
@@ -219,7 +219,7 @@ export function PhotoCanvas({
             ) : null}
           </Layer>
           <Layer scaleX={displayScale} scaleY={displayScale}>
-            {overlayImage ? <KonvaImage image={overlayImage} width={size.width} height={size.height} listening={false} /> : null}
+            {templateImage ? <KonvaImage image={templateImage} width={size.width} height={size.height} listening={false} /> : null}
           </Layer>
         </Stage>
       </div>
