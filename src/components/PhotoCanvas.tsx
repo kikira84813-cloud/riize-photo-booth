@@ -39,6 +39,7 @@ export function PhotoCanvas({
   const stageRef = useRef<Konva.Stage>(null);
   const userImageRef = useRef<Konva.Image>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const pinchRef = useRef<{ distance: number; center: { x: number; y: number }; placement: Placement } | null>(null);
   const [displayWidth, setDisplayWidth] = useState(720);
   const templateImage = useImageElement(template.file);
   const maskImage = useImageElement(template.mask);
@@ -82,7 +83,8 @@ export function PhotoCanvas({
       return;
     }
 
-    imageNode.cache({ pixelRatio: 2 });
+    const cachePixelRatio = window.matchMedia("(max-width: 768px)").matches ? 1 : 2;
+    imageNode.cache({ pixelRatio: cachePixelRatio });
     imageNode.getLayer()?.batchDraw();
 
     return () => {
@@ -109,6 +111,57 @@ export function PhotoCanvas({
     });
   }, [template.id, userImage, size.width, size.height, onPlacementChange]);
 
+
+  const getTouchInfo = (event: Konva.KonvaEventObject<TouchEvent>) => {
+    const touches = event.evt.touches;
+    if (touches.length < 2 || !stageRef.current) {
+      return null;
+    }
+
+    const rect = stageRef.current.container().getBoundingClientRect();
+    const first = touches[0];
+    const second = touches[1];
+    const center = {
+      x: ((first.clientX + second.clientX) / 2 - rect.left) / displayScale,
+      y: ((first.clientY + second.clientY) / 2 - rect.top) / displayScale
+    };
+    const distance = Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY);
+
+    return { center, distance };
+  };
+
+  const handleTouchStart = (event: Konva.KonvaEventObject<TouchEvent>) => {
+    const info = getTouchInfo(event);
+    if (!info) {
+      pinchRef.current = null;
+      return;
+    }
+
+    event.evt.preventDefault();
+    pinchRef.current = { ...info, placement };
+  };
+
+  const handleTouchMove = (event: Konva.KonvaEventObject<TouchEvent>) => {
+    const start = pinchRef.current;
+    const info = getTouchInfo(event);
+    if (!start || !info) {
+      return;
+    }
+
+    event.evt.preventDefault();
+    const nextScale = Math.min(3.5, Math.max(0.05, start.placement.scale * (info.distance / start.distance)));
+    const nextX = info.center.x - (start.center.x - start.placement.x) * (nextScale / start.placement.scale);
+    const nextY = info.center.y - (start.center.y - start.placement.y) * (nextScale / start.placement.scale);
+
+    onPlacementChange({ x: nextX, y: nextY, scale: Number(nextScale.toFixed(3)) });
+  };
+
+  const handleTouchEnd = (event: Konva.KonvaEventObject<TouchEvent>) => {
+    if (event.evt.touches.length < 2) {
+      pinchRef.current = null;
+    }
+  };
+
   return (
     <div className="relative mx-auto w-full max-w-[760px]">
       <div ref={wrapperRef} className="mx-auto w-full max-w-[720px]">
@@ -117,7 +170,10 @@ export function PhotoCanvas({
           ref={stageRef}
           width={displayWidth}
           height={displayHeight}
-          className="block"
+          className="block touch-none"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           <Layer scaleX={displayScale} scaleY={displayScale}>
             <Rect width={size.width} height={size.height} fill="#fff" />

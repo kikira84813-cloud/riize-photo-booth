@@ -307,7 +307,7 @@ export default function Home() {
         <div className="relative z-10 grid min-h-screen gap-4 px-3 pb-4 pt-14 lg:grid-cols-[330px_minmax(0,1fr)_300px]">
           <WindowFrame
             title="Templates"
-            className="order-2 h-[310px] lg:order-1 lg:h-[calc(100vh-5rem)]"
+            className="order-1 h-[310px] lg:order-1 lg:h-[calc(100vh-5rem)]"
             bodyClassName="h-[calc(100%-2rem)] overflow-y-auto p-4"
           >
             <div className="grid grid-cols-3 gap-x-4 gap-y-5 sm:grid-cols-4 lg:grid-cols-3">
@@ -333,7 +333,7 @@ export default function Home() {
 
           <WindowFrame
             title="Photo Booth"
-            className="order-1 self-start lg:order-2 lg:h-[calc(100vh-5rem)]"
+            className="order-2 self-start lg:order-2 lg:h-[calc(100vh-5rem)]"
             bodyClassName="bg-[#e9e9e9] p-3 sm:p-6 lg:h-[calc(100%-2rem)] lg:overflow-y-auto"
           >
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -406,7 +406,7 @@ export default function Home() {
                     Selected file
                     <div className="mt-1 font-sans text-lg font-bold">{selectedTemplate.name}</div>
                   </div>
-                  <img src={selectedTemplate.file} alt="" className="aspect-[3/2] w-full border border-black object-cover" />
+                  <img src={selectedTemplate.thumbnail} alt="" loading="lazy" decoding="async" className="aspect-[3/2] w-full border border-black bg-white object-contain" />
                   <button
                     onClick={() => setActiveTab("photo")}
                     className="flex h-11 w-full items-center justify-center gap-2 bg-black font-pixel text-sm text-white"
