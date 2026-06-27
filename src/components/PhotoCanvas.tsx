@@ -93,47 +93,39 @@ export function PhotoCanvas({
     onReady(stageRef.current);
     return () => onReady(null);
   }, [onReady]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!sourceUserImage || !maskImage || !templateReady) {
       setRenderedPhotoCanvas(null);
       return;
     }
 
-    let cancelled = false;
-    const frame = window.requestAnimationFrame(() => {
-      const canvas = renderCanvasRef.current ?? document.createElement("canvas");
-      if (canvas.width !== size.width || canvas.height !== size.height) {
-        canvas.width = size.width;
-        canvas.height = size.height;
-      }
-      renderCanvasRef.current = canvas;
-      const ctx = canvas.getContext("2d");
+    const canvas = renderCanvasRef.current ?? document.createElement("canvas");
+    if (canvas.width !== size.width || canvas.height !== size.height) {
+      canvas.width = size.width;
+      canvas.height = size.height;
+    }
+    renderCanvasRef.current = canvas;
+    const ctx = canvas.getContext("2d");
 
-      if (!ctx || cancelled) {
-        return;
-      }
+    if (!ctx) {
+      return;
+    }
 
-      ctx.clearRect(0, 0, size.width, size.height);
-      ctx.filter = hasPhotoAdjustments(adjustments) ? buildCanvasFilter(adjustments) : "none";
-      ctx.drawImage(
-        sourceUserImage,
-        placement.x,
-        placement.y,
-        sourceUserImage.naturalWidth * placement.scale,
-        sourceUserImage.naturalHeight * placement.scale
-      );
-      ctx.filter = "none";
-      ctx.globalCompositeOperation = "destination-in";
-      ctx.drawImage(maskImage, 0, 0, size.width, size.height);
-      ctx.globalCompositeOperation = "source-over";
-      setRenderedPhotoCanvas((current) => current ?? canvas);
-      renderedPhotoRef.current?.getLayer()?.batchDraw();
-    });
-
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(frame);
-    };
+    ctx.clearRect(0, 0, size.width, size.height);
+    ctx.filter = hasPhotoAdjustments(adjustments) ? buildCanvasFilter(adjustments) : "none";
+    ctx.drawImage(
+      sourceUserImage,
+      placement.x,
+      placement.y,
+      sourceUserImage.naturalWidth * placement.scale,
+      sourceUserImage.naturalHeight * placement.scale
+    );
+    ctx.filter = "none";
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.drawImage(maskImage, 0, 0, size.width, size.height);
+    ctx.globalCompositeOperation = "source-over";
+    setRenderedPhotoCanvas((current) => current ?? canvas);
+    renderedPhotoRef.current?.getLayer()?.batchDraw();
   }, [
     template.id,
     sourceUserImage,
