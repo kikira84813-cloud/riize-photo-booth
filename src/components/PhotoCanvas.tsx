@@ -19,6 +19,16 @@ export type PhotoAdjustments = {
   hue: number;
 };
 
+function hasPhotoAdjustments(adjustments: PhotoAdjustments) {
+  return adjustments.brightness !== 0 || adjustments.contrast !== 0 || adjustments.saturation !== 0 || adjustments.hue !== 0;
+}
+
+function buildCanvasFilter(adjustments: PhotoAdjustments) {
+  const brightness = Math.max(0, 1 + adjustments.brightness);
+  const contrast = Math.max(0, 1 + adjustments.contrast / 100);
+  const saturation = Math.max(0, 1 + adjustments.saturation);
+  return `brightness(${brightness}) contrast(${contrast}) saturate(${saturation}) hue-rotate(${adjustments.hue}deg)`;
+}
 type PhotoCanvasProps = {
   template: IdolTemplate;
   userPhoto: string | null;
@@ -37,14 +47,15 @@ export function PhotoCanvas({
   onReady
 }: PhotoCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
-  const userImageRef = useRef<Konva.Image>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const pinchRef = useRef<{ distance: number; center: { x: number; y: number }; placement: Placement } | null>(null);
   const [displayWidth, setDisplayWidth] = useState(720);
   const templateImage = useImageElement(template.file);
   const thumbnailImage = useImageElement(template.thumbnail);
   const maskImage = useImageElement(template.mask);
-  const userImage = useImageElement(userPhoto);
+  const sourceUserImage = useImageElement(userPhoto);
+  const [adjustedPhoto, setAdjustedPhoto] = useState<string | null>(null);
+  const userImage = useImageElement(adjustedPhoto ?? userPhoto);
 
   const displayTemplateImage = templateImage ?? thumbnailImage;
   const templateReady = Boolean(templateImage && maskImage);
@@ -81,24 +92,39 @@ export function PhotoCanvas({
     onReady(stageRef.current);
     return () => onReady(null);
   }, [onReady]);
-  useLayoutEffect(() => {
-    const imageNode = userImageRef.current;
-    if (!imageNode || !userImage || !templateReady) {
+  useEffect(() => {
+    if (!sourceUserImage || !hasPhotoAdjustments(adjustments)) {
+      setAdjustedPhoto(null);
       return;
     }
 
-    const cachePixelRatio = window.matchMedia("(max-width: 768px)").matches ? 1 : 2;
-    imageNode.clearCache();
-    imageNode.cache({ pixelRatio: cachePixelRatio });
-    imageNode.getLayer()?.batchDraw();
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      const canvas = document.createElement("canvas");
+      canvas.width = sourceUserImage.naturalWidth;
+      canvas.height = sourceUserImage.naturalHeight;
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        setAdjustedPhoto(null);
+        return;
+      }
+
+      ctx.filter = buildCanvasFilter(adjustments);
+      ctx.drawImage(sourceUserImage, 0, 0);
+
+      if (!cancelled) {
+        setAdjustedPhoto(canvas.toDataURL("image/jpeg", 0.92));
+      }
+    });
 
     return () => {
-      imageNode.clearCache();
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
     };
-  }, [userImage, templateReady, template.id, adjustments.brightness, adjustments.contrast, adjustments.saturation, adjustments.hue]);
-
+  }, [sourceUserImage, adjustments.brightness, adjustments.contrast, adjustments.saturation, adjustments.hue]);
   useLayoutEffect(() => {
-    if (!userImage || !templateReady) {
+    if (!sourceUserImage || !templateReady) {
       return;
     }
 
@@ -108,13 +134,13 @@ export function PhotoCanvas({
       width: template.slot.width * size.width,
       height: template.slot.height * size.height
     };
-    const nextScale = Number(Math.min(slot.width / userImage.naturalWidth, slot.height / userImage.naturalHeight).toFixed(3));
+    const nextScale = Number(Math.min(slot.width / sourceUserImage.naturalWidth, slot.height / sourceUserImage.naturalHeight).toFixed(3));
     onPlacementChange({
-      x: slot.x + (slot.width - userImage.naturalWidth * nextScale) / 2,
-      y: slot.y + (slot.height - userImage.naturalHeight * nextScale) / 2,
+      x: slot.x + (slot.width - sourceUserImage.naturalWidth * nextScale) / 2,
+      y: slot.y + (slot.height - sourceUserImage.naturalHeight * nextScale) / 2,
       scale: nextScale
     });
-  }, [template.id, userImage, templateReady, size.width, size.height, onPlacementChange]);
+  }, [template.id, sourceUserImage, templateReady, size.width, size.height, onPlacementChange]);
 
 
   const getTouchInfo = (event: Konva.KonvaEventObject<TouchEvent>) => {
@@ -188,14 +214,7 @@ export function PhotoCanvas({
             {userImage && templateReady ? (
               <Group>
                 <KonvaImage
-                  ref={userImageRef}
                   image={userImage}
-                  filters={[Konva.Filters.Brighten, Konva.Filters.Contrast, Konva.Filters.HSL]}
-                  brightness={adjustments.brightness}
-                  contrast={adjustments.contrast}
-                  saturation={adjustments.saturation}
-                  hue={adjustments.hue}
-                  luminance={0}
                   x={placement.x}
                   y={placement.y}
                   scaleX={placement.scale}

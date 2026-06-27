@@ -399,7 +399,7 @@ export default function Home() {
                   key={template.id}
                   onClick={() => {
                     setSelectedId(template.id);
-                    setActiveTab("template");
+                    setActiveTab(photo ? "photo" : "template");
                   }}
                   className={`group min-w-0 rounded p-1 text-center font-pixel text-[11px] ${
                     selectedId === template.id ? "bg-[#b7ff73] outline outline-2 outline-black" : "hover:bg-[#f1f1f1]"
