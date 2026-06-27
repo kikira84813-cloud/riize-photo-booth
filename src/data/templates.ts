@@ -139,13 +139,14 @@ export const templates: IdolTemplate[] = templateFiles.map((file, index) => {
   return {
     id: `template-${number}`,
     name: file,
-    file: `/templates/new/${file}`,
+    file: `/templates/new/optimized/template-${number}.webp`,
     thumbnail: `/templates/new/thumbs/template-${number}.jpg`,
     mask: `/templates/new/masks/mask-${number}.png`,
-    overlay: `/templates/new/${file}`,
+    overlay: `/templates/new/optimized/template-${number}.webp`,
     slot: slots[index]
   };
 });
+
 
 
 

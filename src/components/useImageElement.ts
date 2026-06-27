@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 
@@ -10,6 +10,7 @@ export function useImageElement(src?: string | null) {
       setImage(null);
       return;
     }
+    setImage(null);
 
     let cancelled = false;
     const nextImage = new window.Image();
@@ -28,3 +29,4 @@ export function useImageElement(src?: string | null) {
 
   return image;
 }
+
