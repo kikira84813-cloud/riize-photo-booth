@@ -6,7 +6,8 @@ const loadedImages = new Map<string, HTMLImageElement>();
 const loadingImages = new Map<string, Promise<HTMLImageElement>>();
 
 function loadImage(src: string) {
-  const cached = loadedImages.get(src);
+  const canCache = !src.startsWith("blob:");
+  const cached = canCache ? loadedImages.get(src) : null;
   if (cached) {
     return Promise.resolve(cached);
   }
@@ -21,7 +22,9 @@ function loadImage(src: string) {
     nextImage.crossOrigin = "anonymous";
     nextImage.decoding = "async";
     nextImage.onload = () => {
-      loadedImages.set(src, nextImage);
+      if (canCache) {
+        loadedImages.set(src, nextImage);
+      }
       loadingImages.delete(src);
       resolve(nextImage);
     };
@@ -37,7 +40,7 @@ function loadImage(src: string) {
 }
 
 export function useImageElement(src?: string | null) {
-  const [image, setImage] = useState<HTMLImageElement | null>(() => (src ? loadedImages.get(src) ?? null : null));
+  const [image, setImage] = useState<HTMLImageElement | null>(() => (src && !src.startsWith("blob:") ? loadedImages.get(src) ?? null : null));
 
   useEffect(() => {
     if (!src) {
@@ -45,7 +48,7 @@ export function useImageElement(src?: string | null) {
       return;
     }
 
-    const cached = loadedImages.get(src);
+    const cached = !src.startsWith("blob:") ? loadedImages.get(src) : null;
     if (cached) {
       setImage(cached);
       return;

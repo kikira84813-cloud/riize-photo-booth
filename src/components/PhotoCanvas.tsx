@@ -59,6 +59,15 @@ export function PhotoCanvas({
 
   const displayTemplateImage = templateImage ?? thumbnailImage;
   const templateReady = Boolean(templateImage && maskImage);
+  const photoRenderKey = [
+    template.id,
+    userPhoto ? userPhoto.length : 0,
+    adjustments.brightness,
+    adjustments.contrast,
+    adjustments.saturation,
+    adjustments.hue,
+    adjustedPhoto ? "adjusted" : "original"
+  ].join("-");
 
   const size = useMemo(() => {
     const sourceImage = maskImage ?? templateImage ?? thumbnailImage;
@@ -99,6 +108,7 @@ export function PhotoCanvas({
     }
 
     let cancelled = false;
+    let objectUrl: string | null = null;
     const frame = window.requestAnimationFrame(() => {
       const canvas = document.createElement("canvas");
       canvas.width = sourceUserImage.naturalWidth;
@@ -112,17 +122,28 @@ export function PhotoCanvas({
 
       ctx.filter = buildCanvasFilter(adjustments);
       ctx.drawImage(sourceUserImage, 0, 0);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob || cancelled) {
+            return;
+          }
 
-      if (!cancelled) {
-        setAdjustedPhoto(canvas.toDataURL("image/jpeg", 0.92));
-      }
+          objectUrl = URL.createObjectURL(blob);
+          setAdjustedPhoto(objectUrl);
+        },
+        "image/jpeg",
+        0.92
+      );
     });
 
     return () => {
       cancelled = true;
       window.cancelAnimationFrame(frame);
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
     };
-  }, [sourceUserImage, adjustments.brightness, adjustments.contrast, adjustments.saturation, adjustments.hue]);
+  }, [template.id, sourceUserImage, adjustments.brightness, adjustments.contrast, adjustments.saturation, adjustments.hue]);
   useLayoutEffect(() => {
     if (!sourceUserImage || !templateReady) {
       return;
@@ -212,8 +233,9 @@ export function PhotoCanvas({
           </Layer>
           <Layer scaleX={displayScale} scaleY={displayScale}>
             {userImage && templateReady ? (
-              <Group>
+              <Group key={`photo-layer-${photoRenderKey}`}>
                 <KonvaImage
+                  key={`photo-${photoRenderKey}`}
                   image={userImage}
                   x={placement.x}
                   y={placement.y}
@@ -229,6 +251,7 @@ export function PhotoCanvas({
                   }}
                 />
                 <KonvaImage
+                  key={`mask-${template.id}`}
                   image={maskImage}
                   width={size.width}
                   height={size.height}
