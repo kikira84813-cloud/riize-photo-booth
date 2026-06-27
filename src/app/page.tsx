@@ -80,6 +80,8 @@ export default function Home() {
   const [stage, setStage] = useState<Konva.Stage | null>(null);
   const [showLoading, setShowLoading] = useState(true);
   const [loadingLeaving, setLoadingLeaving] = useState(false);
+  const photoAdjustmentsRef = useRef<PhotoAdjustments>(defaultPhotoAdjustments);
+  const adjustmentFrameRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -90,6 +92,19 @@ export default function Home() {
 
   const updatePlacement = useCallback((nextPlacement: Placement) => {
     setPlacement(nextPlacement);
+  }, []);
+
+
+  useEffect(() => {
+    photoAdjustmentsRef.current = photoAdjustments;
+  }, [photoAdjustments]);
+
+  useEffect(() => {
+    return () => {
+      if (adjustmentFrameRef.current !== null) {
+        window.cancelAnimationFrame(adjustmentFrameRef.current);
+      }
+    };
   }, []);
 
   const stopCamera = useCallback(() => {
@@ -175,11 +190,24 @@ export default function Home() {
     setPhoto(null);
   };
   const updatePhotoAdjustment = (key: keyof PhotoAdjustments, value: number) => {
-    setPhotoAdjustments((current) => ({ ...current, [key]: value }));
+    const nextAdjustments = { ...photoAdjustmentsRef.current, [key]: value };
+    photoAdjustmentsRef.current = nextAdjustments;
+    if (adjustmentFrameRef.current !== null) {
+      window.cancelAnimationFrame(adjustmentFrameRef.current);
+    }
+    adjustmentFrameRef.current = window.requestAnimationFrame(() => {
+      setPhotoAdjustments(nextAdjustments);
+      adjustmentFrameRef.current = null;
+    });
+  };
+
+  const applyPhotoAdjustments = (nextAdjustments: PhotoAdjustments) => {
+    photoAdjustmentsRef.current = nextAdjustments;
+    setPhotoAdjustments(nextAdjustments);
   };
 
   const resetPhotoAdjustments = () => {
-    setPhotoAdjustments(defaultPhotoAdjustments);
+    applyPhotoAdjustments(defaultPhotoAdjustments);
   };
 
   const exportJpg = () => {
@@ -384,9 +412,74 @@ export default function Home() {
                 JPG
               </button>
             </div>
+
+            <div className="mt-3 space-y-2 border-t border-black/20 pt-3 sm:hidden">
+              <label className="block border border-black bg-[#f3f3f3] p-2 font-pixel text-[11px]">
+                <span className="flex items-center justify-between gap-3">
+                  <span>Scale</span>
+                  <span>{Math.round(placement.scale * 100)}%</span>
+                </span>
+                <input
+                  className="range-retro mt-1 w-full"
+                  type="range"
+                  min="0.05"
+                  max="3.5"
+                  step="0.01"
+                  value={placement.scale}
+                  disabled={!photo}
+                  onChange={(event) => setPlacement((current) => ({ ...current, scale: Number(event.target.value) }))}
+                />
+              </label>
+              <div className="border border-black bg-[#fffdf0] p-2 font-pixel text-[11px]">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span>Filter Presets</span>
+                  <button
+                    type="button"
+                    onClick={resetPhotoAdjustments}
+                    disabled={!photo}
+                    className="border border-black bg-white px-2 py-1 text-[10px] disabled:opacity-40"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {filterPresets.map((preset) => (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => applyPhotoAdjustments(preset.adjustments)}
+                      disabled={!photo}
+                      className="min-h-8 border border-black bg-white px-1 py-1 text-[9px] shadow-[1px_1px_0_rgba(0,0,0,.18)] disabled:opacity-40"
+                    >
+                      {preset.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 border border-black bg-white p-2 font-pixel text-[10px]">
+                {adjustmentControls.map((control) => (
+                  <label key={control.key} className="block">
+                    <span className="mb-1 flex items-center justify-between gap-2">
+                      <span>{control.label}</span>
+                      <span>{control.display(photoAdjustments[control.key])}</span>
+                    </span>
+                    <input
+                      className="range-retro w-full touch-pan-y"
+                      type="range"
+                      min={control.min}
+                      max={control.max}
+                      step={control.step}
+                      value={photoAdjustments[control.key]}
+                      disabled={!photo}
+                      onChange={(event) => updatePhotoAdjustment(control.key, Number(event.target.value))}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
           </WindowFrame>
 
-          <WindowFrame title="CREATE" className="order-3 self-start lg:h-[calc(100vh-5rem)]" bodyClassName="bg-white lg:h-[calc(100%-2rem)] lg:overflow-y-auto">
+          <WindowFrame title="CREATE" className="hidden order-3 self-start sm:block lg:h-[calc(100vh-5rem)]" bodyClassName="bg-white lg:h-[calc(100%-2rem)] lg:overflow-y-auto">
             <div className="grid grid-cols-3 border-b border-black font-pixel text-xs font-bold">
               {(["template", "photo", "export"] as const).map((tab) => (
                 <button
@@ -465,7 +558,7 @@ export default function Home() {
                         <button
                           key={preset.name}
                           type="button"
-                          onClick={() => setPhotoAdjustments(preset.adjustments)}
+                          onClick={() => applyPhotoAdjustments(preset.adjustments)}
                           disabled={!photo}
                           className="min-h-10 border border-black bg-white px-2 py-2 text-[11px] shadow-[2px_2px_0_rgba(0,0,0,.18)] disabled:opacity-40"
                         >
