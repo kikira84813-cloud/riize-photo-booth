@@ -35,7 +35,7 @@ type PhotoCanvasProps = {
   userPhoto: string | null;
   placement: Placement;
   adjustments: PhotoAdjustments;
-  onPlacementChange: (placement: Placement) => void;
+  onPlacementChange: (placement: Placement, immediate?: boolean) => void;
   onReady: (stage: Konva.Stage | null) => void;
 };
 
@@ -78,7 +78,7 @@ export function PhotoCanvas({
       return 1;
     }
 
-    const maxSide = window.matchMedia("(max-width: 768px)").matches ? 720 : 1200;
+    const maxSide = window.matchMedia("(max-width: 768px)").matches ? 480 : 1200;
     return Math.min(1, maxSide / Math.max(size.width, size.height));
   }, [size.width, size.height]);
 
@@ -273,7 +273,7 @@ export function PhotoCanvas({
                       ...placement,
                       x: event.target.x(),
                       y: event.target.y()
-                    });
+                    }, true);
                   }}
                 />
               ) : null}

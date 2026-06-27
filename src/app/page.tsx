@@ -69,6 +69,7 @@ const adjustmentControls: Array<{
 const initialPlacement: Placement = { x: 0, y: 0, scale: 1 };
 
 const MAX_PHOTO_SIDE = 1600;
+const MOBILE_MAX_PHOTO_SIDE = 900;
 
 function loadPhotoImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -100,7 +101,8 @@ function canvasToJpeg(canvas: HTMLCanvasElement, quality = 0.9): Promise<string>
 
 async function normalizeUserPhoto(src: string) {
   const image = await loadPhotoImage(src);
-  const scale = Math.min(1, MAX_PHOTO_SIDE / Math.max(image.naturalWidth, image.naturalHeight));
+  const maxPhotoSide = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches ? MOBILE_MAX_PHOTO_SIDE : MAX_PHOTO_SIDE;
+  const scale = Math.min(1, maxPhotoSide / Math.max(image.naturalWidth, image.naturalHeight));
 
   if (scale === 1 && src.startsWith("data:image/jpeg")) {
     return src;
@@ -132,6 +134,8 @@ export default function Home() {
   const [loadingLeaving, setLoadingLeaving] = useState(false);
   const photoAdjustmentsRef = useRef<PhotoAdjustments>(defaultPhotoAdjustments);
   const adjustmentFrameRef = useRef<number | null>(null);
+  const placementFrameRef = useRef<number | null>(null);
+  const placementRef = useRef<Placement>(initialPlacement);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -164,10 +168,32 @@ export default function Home() {
     const timer = window.setTimeout(preload, 120);
     return () => window.clearTimeout(timer);
   }, [selectedTemplate.id]);
-  const updatePlacement = useCallback((nextPlacement: Placement) => {
-    setPlacement(nextPlacement);
+  const updatePlacement = useCallback((nextPlacement: Placement, immediate = false) => {
+    placementRef.current = nextPlacement;
+
+    if (immediate) {
+      if (placementFrameRef.current !== null) {
+        window.cancelAnimationFrame(placementFrameRef.current);
+        placementFrameRef.current = null;
+      }
+      setPlacement(nextPlacement);
+      return;
+    }
+
+    if (placementFrameRef.current !== null) {
+      return;
+    }
+
+    placementFrameRef.current = window.requestAnimationFrame(() => {
+      placementFrameRef.current = null;
+      setPlacement(placementRef.current);
+    });
   }, []);
 
+
+  useEffect(() => {
+    placementRef.current = placement;
+  }, [placement]);
 
   useEffect(() => {
     photoAdjustmentsRef.current = photoAdjustments;
@@ -177,6 +203,9 @@ export default function Home() {
     return () => {
       if (adjustmentFrameRef.current !== null) {
         window.cancelAnimationFrame(adjustmentFrameRef.current);
+      }
+      if (placementFrameRef.current !== null) {
+        window.cancelAnimationFrame(placementFrameRef.current);
       }
     };
   }, []);
@@ -514,7 +543,8 @@ export default function Home() {
                   step="0.01"
                   value={placement.scale}
                   disabled={!photo}
-                  onChange={(event) => setPlacement((current) => ({ ...current, scale: Number(event.target.value) }))}
+                  onInput={(event) => updatePlacement({ ...placementRef.current, scale: Number(event.currentTarget.value) })}
+                      onChange={(event) => updatePlacement({ ...placementRef.current, scale: Number(event.target.value) }, true)}
                 />
               </label>
               <div className="border border-black bg-[#fffdf0] p-2 font-pixel text-[11px]">
@@ -632,7 +662,8 @@ export default function Home() {
                       step="0.01"
                       value={placement.scale}
                       disabled={!photo}
-                      onChange={(event) => setPlacement((current) => ({ ...current, scale: Number(event.target.value) }))}
+                      onInput={(event) => updatePlacement({ ...placementRef.current, scale: Number(event.currentTarget.value) })}
+                      onChange={(event) => updatePlacement({ ...placementRef.current, scale: Number(event.target.value) }, true)}
                     />
                     <span className="mt-2 block">{Math.round(placement.scale * 100)}%</span>
                   </label>
