@@ -1,0 +1,32 @@
+# dependencies
+node_modules
+
+# Next.js build output
+.next
+out
+
+# local preview/export output
+outputs
+work
+
+# local Codex/agent metadata
+.agents
+.codex
+
+# TypeScript cache
+tsconfig.tsbuildinfo
+
+# environment files
+.env
+.env.local
+.env.*.local
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor files
+.DS_Store
+Thumbs.db

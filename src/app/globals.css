@@ -1,0 +1,211 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-pixel: "Courier New", Courier, monospace;
+  --ink: #0b0b0f;
+  --cream: #fffdf0;
+  --lime: #a6ff63;
+  --hot-pink: #ff3ea5;
+  --aqua: #40d3d2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--cream);
+  font-family: var(--font-sans);
+}
+.loading-page-base {
+  background:
+    #fff url("/loading-background-fast.jpg") center center / cover fixed no-repeat;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.desktop-grid {
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.045) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.scanlines::after {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.08) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  mix-blend-mode: soft-light;
+}
+
+.snow-cap {
+  background:
+    radial-gradient(circle at 10px 7px, #ffffff 0 6px, transparent 6.5px),
+    radial-gradient(circle at 30px 7px, #eeeeee 0 6px, transparent 6.5px),
+    linear-gradient(#ffffff 0 38%, #eeeeee 62%, #d8d8d8 100%);
+  background-size: 40px 16px, 40px 16px, 100% 100%;
+  background-repeat: repeat-x, repeat-x, no-repeat;
+}
+.range-retro {
+  accent-color: var(--ink);
+  height: 28px;
+  touch-action: pan-y;
+}
+
+.range-retro::-webkit-slider-thumb {
+  cursor: grab;
+}
+
+.range-retro:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    #fff url("/loading-background-fast.jpg") center center / cover no-repeat;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+
+
+.app-shell--loading {
+  visibility: hidden;
+}
+
+.loading-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)),
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px;
+}
+
+.loading-overlay--leaving {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.loading-window {
+  z-index: 1;
+  position: relative;
+  width: min(330px, calc(100vw - 40px));
+  border: 1px solid rgba(63, 77, 86, 0.72);
+  background: rgba(252, 254, 255, 0.94);
+  box-shadow: 7px 8px 0 rgba(130, 160, 174, 0.36), 0 0 0 4px rgba(255, 250, 220, 0.58);
+  text-align: center;
+}
+
+.loading-window__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  border-bottom: 1px solid rgba(63, 77, 86, 0.72);
+  padding: 0 10px;
+  background:
+    radial-gradient(circle at 8px 8px, #fff 0 7px, transparent 8px),
+    linear-gradient(#ffffff, #dfeaf0 52%, #fff7d8);
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  font-weight: 700;
+  color: #30383d;
+  text-transform: lowercase;
+}
+
+.loading-window__dot {
+  width: 12px;
+  height: 12px;
+  border: 1px solid #7d8b92;
+  background: #fff2b8;
+  box-shadow: 2px 2px 0 rgba(90, 116, 128, 0.62);
+}
+
+.loading-booth {
+  width: 176px;
+  margin: 24px auto 12px;
+  filter: drop-shadow(5px 8px 0 rgba(99, 124, 134, 0.22));
+  animation: loading-booth-bounce 1.05s ease-in-out infinite;
+}
+
+.loading-booth svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.loading-copy {
+  margin: 0 auto 14px;
+  width: max-content;
+  max-width: calc(100% - 28px);
+  border: 1px dotted rgba(63, 77, 86, 0.78);
+  background: rgba(255, 250, 220, 0.86);
+  padding: 8px 12px;
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  font-weight: 700;
+  color: #30383d;
+  box-shadow: 3px 3px 0 rgba(173, 207, 219, 0.72);
+}
+
+.loading-pixels {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  padding-bottom: 22px;
+}
+
+.loading-pixels span {
+  width: 7px;
+  height: 7px;
+  border: 1px solid #7d8b92;
+  background: #b9dce8;
+}
+
+.loading-pixels span:nth-child(2) {
+  animation-delay: 0.12s;
+  background: #fff2b8;
+}
+
+.loading-pixels span:nth-child(3) {
+  animation-delay: 0.24s;
+  background: #eefaff;
+}
+@keyframes loading-booth-bounce {
+  0%, 100% {
+    transform: translateY(0) rotate(-0.5deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(0.5deg);
+  }
+}
+
