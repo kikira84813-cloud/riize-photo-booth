@@ -68,6 +68,56 @@ const adjustmentControls: Array<{
 
 const initialPlacement: Placement = { x: 0, y: 0, scale: 1 };
 
+const MAX_PHOTO_SIDE = 1600;
+
+function loadPhotoImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Photo failed to load."));
+    image.src = src;
+  });
+}
+
+function canvasToJpeg(canvas: HTMLCanvasElement, quality = 0.9): Promise<string> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Photo export failed."));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error("Photo conversion failed."));
+        reader.readAsDataURL(blob);
+      },
+      "image/jpeg",
+      quality
+    );
+  });
+}
+
+async function normalizeUserPhoto(src: string) {
+  const image = await loadPhotoImage(src);
+  const scale = Math.min(1, MAX_PHOTO_SIDE / Math.max(image.naturalWidth, image.naturalHeight));
+
+  if (scale === 1 && src.startsWith("data:image/jpeg")) {
+    return src;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) {
+    return src;
+  }
+
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvasToJpeg(canvas);
+}
 export default function Home() {
   const [selectedId, setSelectedId] = useState(templates[0].id);
   const [photo, setPhoto] = useState<string | null>(null);
@@ -157,13 +207,19 @@ export default function Home() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => {
-      setPhoto(String(reader.result));
+    reader.onload = async () => {
+      const nextPhoto = String(reader.result);
+      setPlacement(initialPlacement);
+      try {
+        setPhoto(await normalizeUserPhoto(nextPhoto));
+      } catch {
+        setPhoto(nextPhoto);
+      }
       setActiveTab("photo");
     };
     reader.readAsDataURL(file);
   };
-  const captureCamera = () => {
+  const captureCamera = async () => {
     const video = videoRef.current;
     if (!video) {
       return;
@@ -179,7 +235,13 @@ export default function Home() {
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    setPhoto(canvas.toDataURL("image/jpeg", 0.92));
+    const nextPhoto = canvas.toDataURL("image/jpeg", 0.92);
+    setPlacement(initialPlacement);
+    try {
+      setPhoto(await normalizeUserPhoto(nextPhoto));
+    } catch {
+      setPhoto(nextPhoto);
+    }
     setCameraOpen(false);
     setActiveTab("photo");
   };
@@ -191,13 +253,7 @@ export default function Home() {
   const updatePhotoAdjustment = (key: keyof PhotoAdjustments, value: number) => {
     const nextAdjustments = { ...photoAdjustmentsRef.current, [key]: value };
     photoAdjustmentsRef.current = nextAdjustments;
-    if (adjustmentFrameRef.current !== null) {
-      window.cancelAnimationFrame(adjustmentFrameRef.current);
-    }
-    adjustmentFrameRef.current = window.requestAnimationFrame(() => {
-      setPhotoAdjustments(nextAdjustments);
-      adjustmentFrameRef.current = null;
-    });
+    setPhotoAdjustments(nextAdjustments);
   };
 
   const applyPhotoAdjustments = (nextAdjustments: PhotoAdjustments) => {
@@ -647,6 +703,3 @@ export default function Home() {
     </main>
   );
 }
-
-
-

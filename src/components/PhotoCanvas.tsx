@@ -2,7 +2,7 @@
 
 import Konva from "konva";
 import { Image as KonvaImage, Layer, Rect, Stage, Group } from "react-konva";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { IdolTemplate } from "@/data/templates";
 import { useImageElement } from "./useImageElement";
 
@@ -81,13 +81,14 @@ export function PhotoCanvas({
     onReady(stageRef.current);
     return () => onReady(null);
   }, [onReady]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const imageNode = userImageRef.current;
-    if (!imageNode || !userImage) {
+    if (!imageNode || !userImage || !templateReady) {
       return;
     }
 
     const cachePixelRatio = window.matchMedia("(max-width: 768px)").matches ? 1 : 2;
+    imageNode.clearCache();
     imageNode.cache({ pixelRatio: cachePixelRatio });
     imageNode.getLayer()?.batchDraw();
 
@@ -96,8 +97,8 @@ export function PhotoCanvas({
     };
   }, [userImage, templateReady, template.id, adjustments.brightness, adjustments.contrast, adjustments.saturation, adjustments.hue]);
 
-  useEffect(() => {
-    if (!userImage) {
+  useLayoutEffect(() => {
+    if (!userImage || !templateReady) {
       return;
     }
 
@@ -113,7 +114,7 @@ export function PhotoCanvas({
       y: slot.y + (slot.height - userImage.naturalHeight * nextScale) / 2,
       scale: nextScale
     });
-  }, [template.id, userImage, size.width, size.height, onPlacementChange]);
+  }, [template.id, userImage, templateReady, size.width, size.height, onPlacementChange]);
 
 
   const getTouchInfo = (event: Konva.KonvaEventObject<TouchEvent>) => {
