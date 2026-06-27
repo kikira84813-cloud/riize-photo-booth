@@ -73,6 +73,15 @@ export function PhotoCanvas({
   const displayScale = displayWidth / size.width;
   const displayHeight = size.height * displayScale;
 
+  const renderScale = useMemo(() => {
+    if (typeof window === "undefined") {
+      return 1;
+    }
+
+    const maxSide = window.matchMedia("(max-width: 768px)").matches ? 720 : 1200;
+    return Math.min(1, maxSide / Math.max(size.width, size.height));
+  }, [size.width, size.height]);
+
   useEffect(() => {
     const node = wrapperRef.current;
     if (!node) {
@@ -100,9 +109,11 @@ export function PhotoCanvas({
     }
 
     const canvas = renderCanvasRef.current ?? document.createElement("canvas");
-    if (canvas.width !== size.width || canvas.height !== size.height) {
-      canvas.width = size.width;
-      canvas.height = size.height;
+    const renderWidth = Math.max(1, Math.round(size.width * renderScale));
+    const renderHeight = Math.max(1, Math.round(size.height * renderScale));
+    if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
+      canvas.width = renderWidth;
+      canvas.height = renderHeight;
     }
     renderCanvasRef.current = canvas;
     const ctx = canvas.getContext("2d");
@@ -111,6 +122,7 @@ export function PhotoCanvas({
       return;
     }
 
+    ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     ctx.clearRect(0, 0, size.width, size.height);
     ctx.filter = hasPhotoAdjustments(adjustments) ? buildCanvasFilter(adjustments) : "none";
     ctx.drawImage(
@@ -124,6 +136,7 @@ export function PhotoCanvas({
     ctx.globalCompositeOperation = "destination-in";
     ctx.drawImage(maskImage, 0, 0, size.width, size.height);
     ctx.globalCompositeOperation = "source-over";
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     setRenderedPhotoCanvas((current) => current ?? canvas);
     renderedPhotoRef.current?.getLayer()?.batchDraw();
   }, [
@@ -133,6 +146,7 @@ export function PhotoCanvas({
     templateReady,
     size.width,
     size.height,
+    renderScale,
     placement.x,
     placement.y,
     placement.scale,

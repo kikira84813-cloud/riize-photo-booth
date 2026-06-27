@@ -277,7 +277,15 @@ export default function Home() {
   const updatePhotoAdjustment = (key: keyof PhotoAdjustments, value: number) => {
     const nextAdjustments = { ...photoAdjustmentsRef.current, [key]: value };
     photoAdjustmentsRef.current = nextAdjustments;
-    setPhotoAdjustments(nextAdjustments);
+
+    if (adjustmentFrameRef.current !== null) {
+      window.cancelAnimationFrame(adjustmentFrameRef.current);
+    }
+
+    adjustmentFrameRef.current = window.requestAnimationFrame(() => {
+      adjustmentFrameRef.current = null;
+      setPhotoAdjustments(photoAdjustmentsRef.current);
+    });
   };
 
   const applyPhotoAdjustments = (nextAdjustments: PhotoAdjustments) => {
@@ -550,6 +558,7 @@ export default function Home() {
                       step={control.step}
                       value={photoAdjustments[control.key]}
                       disabled={!photo}
+                      onInput={(event) => updatePhotoAdjustment(control.key, Number(event.currentTarget.value))}
                       onChange={(event) => updatePhotoAdjustment(control.key, Number(event.target.value))}
                     />
                   </label>
@@ -668,6 +677,7 @@ export default function Home() {
                           step={control.step}
                           value={photoAdjustments[control.key]}
                           disabled={!photo}
+                      onInput={(event) => updatePhotoAdjustment(control.key, Number(event.currentTarget.value))}
                           onChange={(event) => updatePhotoAdjustment(control.key, Number(event.target.value))}
                         />
                       </label>
