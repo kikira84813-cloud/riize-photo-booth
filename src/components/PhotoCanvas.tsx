@@ -1,7 +1,7 @@
 "use client";
 
 import Konva from "konva";
-import { Image as KonvaImage, Layer, Rect, Stage, Group } from "react-konva";
+import { Image as KonvaImage, Layer, Rect, Stage } from "react-konva";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { IdolTemplate } from "@/data/templates";
 import { useImageElement } from "./useImageElement";
@@ -29,6 +29,7 @@ function buildCanvasFilter(adjustments: PhotoAdjustments) {
   const saturation = Math.max(0, 1 + adjustments.saturation);
   return `brightness(${brightness}) contrast(${contrast}) saturate(${saturation}) hue-rotate(${adjustments.hue}deg)`;
 }
+
 type PhotoCanvasProps = {
   template: IdolTemplate;
   userPhoto: string | null;
@@ -50,24 +51,15 @@ export function PhotoCanvas({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const pinchRef = useRef<{ distance: number; center: { x: number; y: number }; placement: Placement } | null>(null);
   const [displayWidth, setDisplayWidth] = useState(720);
+  const [renderedPhoto, setRenderedPhoto] = useState<string | null>(null);
   const templateImage = useImageElement(template.file);
   const thumbnailImage = useImageElement(template.thumbnail);
   const maskImage = useImageElement(template.mask);
   const sourceUserImage = useImageElement(userPhoto);
-  const [adjustedPhoto, setAdjustedPhoto] = useState<string | null>(null);
-  const userImage = useImageElement(adjustedPhoto ?? userPhoto);
+  const userImage = useImageElement(renderedPhoto);
 
   const displayTemplateImage = templateImage ?? thumbnailImage;
   const templateReady = Boolean(templateImage && maskImage);
-  const photoRenderKey = [
-    template.id,
-    userPhoto ? userPhoto.length : 0,
-    adjustments.brightness,
-    adjustments.contrast,
-    adjustments.saturation,
-    adjustments.hue,
-    adjustedPhoto ? "adjusted" : "original"
-  ].join("-");
 
   const size = useMemo(() => {
     const sourceImage = maskImage ?? templateImage ?? thumbnailImage;
@@ -79,6 +71,18 @@ export function PhotoCanvas({
 
   const displayScale = displayWidth / size.width;
   const displayHeight = size.height * displayScale;
+  const photoRenderKey = [
+    template.id,
+    userPhoto ? userPhoto.length : 0,
+    Math.round(placement.x),
+    Math.round(placement.y),
+    placement.scale,
+    adjustments.brightness,
+    adjustments.contrast,
+    adjustments.saturation,
+    adjustments.hue,
+    renderedPhoto ? "rendered" : "empty"
+  ].join("-");
 
   useEffect(() => {
     const node = wrapperRef.current;
@@ -101,9 +105,10 @@ export function PhotoCanvas({
     onReady(stageRef.current);
     return () => onReady(null);
   }, [onReady]);
+
   useEffect(() => {
-    if (!sourceUserImage || !hasPhotoAdjustments(adjustments)) {
-      setAdjustedPhoto(null);
+    if (!sourceUserImage || !maskImage || !templateReady) {
+      setRenderedPhoto(null);
       return;
     }
 
@@ -111,29 +116,36 @@ export function PhotoCanvas({
     let objectUrl: string | null = null;
     const frame = window.requestAnimationFrame(() => {
       const canvas = document.createElement("canvas");
-      canvas.width = sourceUserImage.naturalWidth;
-      canvas.height = sourceUserImage.naturalHeight;
+      canvas.width = size.width;
+      canvas.height = size.height;
       const ctx = canvas.getContext("2d");
 
       if (!ctx) {
-        setAdjustedPhoto(null);
+        setRenderedPhoto(null);
         return;
       }
 
-      ctx.filter = buildCanvasFilter(adjustments);
-      ctx.drawImage(sourceUserImage, 0, 0);
-      canvas.toBlob(
-        (blob) => {
-          if (!blob || cancelled) {
-            return;
-          }
-
-          objectUrl = URL.createObjectURL(blob);
-          setAdjustedPhoto(objectUrl);
-        },
-        "image/jpeg",
-        0.92
+      ctx.clearRect(0, 0, size.width, size.height);
+      ctx.filter = hasPhotoAdjustments(adjustments) ? buildCanvasFilter(adjustments) : "none";
+      ctx.drawImage(
+        sourceUserImage,
+        placement.x,
+        placement.y,
+        sourceUserImage.naturalWidth * placement.scale,
+        sourceUserImage.naturalHeight * placement.scale
       );
+      ctx.filter = "none";
+      ctx.globalCompositeOperation = "destination-in";
+      ctx.drawImage(maskImage, 0, 0, size.width, size.height);
+      ctx.globalCompositeOperation = "source-over";
+      canvas.toBlob((blob) => {
+        if (!blob || cancelled) {
+          return;
+        }
+
+        objectUrl = URL.createObjectURL(blob);
+        setRenderedPhoto(objectUrl);
+      }, "image/png");
     });
 
     return () => {
@@ -143,7 +155,22 @@ export function PhotoCanvas({
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [template.id, sourceUserImage, adjustments.brightness, adjustments.contrast, adjustments.saturation, adjustments.hue]);
+  }, [
+    template.id,
+    sourceUserImage,
+    maskImage,
+    templateReady,
+    size.width,
+    size.height,
+    placement.x,
+    placement.y,
+    placement.scale,
+    adjustments.brightness,
+    adjustments.contrast,
+    adjustments.saturation,
+    adjustments.hue
+  ]);
+
   useLayoutEffect(() => {
     if (!sourceUserImage || !templateReady) {
       return;
@@ -162,7 +189,6 @@ export function PhotoCanvas({
       scale: nextScale
     });
   }, [template.id, sourceUserImage, templateReady, size.width, size.height, onPlacementChange]);
-
 
   const getTouchInfo = (event: Konva.KonvaEventObject<TouchEvent>) => {
     const touches = event.evt.touches;
@@ -217,31 +243,46 @@ export function PhotoCanvas({
   return (
     <div className="relative mx-auto w-full max-w-[760px]">
       <div ref={wrapperRef} className="mx-auto w-[62%] max-w-[720px] sm:w-full">
-      <div className="relative overflow-hidden rounded-[3px] border border-black bg-white shadow-sticker">
-        <Stage
-          ref={stageRef}
-          width={displayWidth}
-          height={displayHeight}
-          className="block touch-none"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <Layer scaleX={displayScale} scaleY={displayScale}>
-            <Rect width={size.width} height={size.height} fill="#fff" />
-            {displayTemplateImage ? <KonvaImage image={displayTemplateImage} width={size.width} height={size.height} /> : null}
-          </Layer>
-          <Layer scaleX={displayScale} scaleY={displayScale}>
-            {userImage && templateReady ? (
-              <Group key={`photo-layer-${photoRenderKey}`}>
+        <div className="relative overflow-hidden rounded-[3px] border border-black bg-white shadow-sticker">
+          <Stage
+            ref={stageRef}
+            width={displayWidth}
+            height={displayHeight}
+            className="block touch-none"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <Layer scaleX={displayScale} scaleY={displayScale}>
+              <Rect width={size.width} height={size.height} fill="#fff" />
+              {displayTemplateImage ? <KonvaImage image={displayTemplateImage} width={size.width} height={size.height} /> : null}
+            </Layer>
+            <Layer scaleX={displayScale} scaleY={displayScale}>
+              {userImage && templateReady ? (
                 <KonvaImage
-                  key={`photo-${photoRenderKey}`}
+                  key={`rendered-photo-${photoRenderKey}`}
                   image={userImage}
+                  width={size.width}
+                  height={size.height}
+                  listening={false}
+                />
+              ) : null}
+              {sourceUserImage && templateReady ? (
+                <Rect
+                  key={`photo-drag-${template.id}`}
                   x={placement.x}
                   y={placement.y}
-                  scaleX={placement.scale}
-                  scaleY={placement.scale}
+                  width={sourceUserImage.naturalWidth * placement.scale}
+                  height={sourceUserImage.naturalHeight * placement.scale}
+                  fill="rgba(0,0,0,0)"
                   draggable
+                  onDragMove={(event) => {
+                    onPlacementChange({
+                      ...placement,
+                      x: event.target.x(),
+                      y: event.target.y()
+                    });
+                  }}
                   onDragEnd={(event) => {
                     onPlacementChange({
                       ...placement,
@@ -250,22 +291,13 @@ export function PhotoCanvas({
                     });
                   }}
                 />
-                <KonvaImage
-                  key={`mask-${template.id}`}
-                  image={maskImage}
-                  width={size.width}
-                  height={size.height}
-                  listening={false}
-                  globalCompositeOperation="destination-in"
-                />
-              </Group>
-            ) : null}
-          </Layer>
-          <Layer scaleX={displayScale} scaleY={displayScale}>
-            {templateImage ? <KonvaImage image={templateImage} width={size.width} height={size.height} listening={false} /> : null}
-          </Layer>
-        </Stage>
-      </div>
+              ) : null}
+            </Layer>
+            <Layer scaleX={displayScale} scaleY={displayScale}>
+              {templateImage ? <KonvaImage image={templateImage} width={size.width} height={size.height} listening={false} /> : null}
+            </Layer>
+          </Stage>
+        </div>
       </div>
     </div>
   );
