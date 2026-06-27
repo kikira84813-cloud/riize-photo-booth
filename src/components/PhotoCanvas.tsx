@@ -48,15 +48,16 @@ export function PhotoCanvas({
   onReady
 }: PhotoCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
+  const renderedPhotoRef = useRef<Konva.Image>(null);
+  const renderCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const pinchRef = useRef<{ distance: number; center: { x: number; y: number }; placement: Placement } | null>(null);
   const [displayWidth, setDisplayWidth] = useState(720);
-  const [renderedPhoto, setRenderedPhoto] = useState<string | null>(null);
+  const [renderedPhotoCanvas, setRenderedPhotoCanvas] = useState<HTMLCanvasElement | null>(null);
   const templateImage = useImageElement(template.file);
   const thumbnailImage = useImageElement(template.thumbnail);
   const maskImage = useImageElement(template.mask);
   const sourceUserImage = useImageElement(userPhoto);
-  const userImage = useImageElement(renderedPhoto);
 
   const displayTemplateImage = templateImage ?? thumbnailImage;
   const templateReady = Boolean(templateImage && maskImage);
@@ -71,18 +72,6 @@ export function PhotoCanvas({
 
   const displayScale = displayWidth / size.width;
   const displayHeight = size.height * displayScale;
-  const photoRenderKey = [
-    template.id,
-    userPhoto ? userPhoto.length : 0,
-    Math.round(placement.x),
-    Math.round(placement.y),
-    placement.scale,
-    adjustments.brightness,
-    adjustments.contrast,
-    adjustments.saturation,
-    adjustments.hue,
-    renderedPhoto ? "rendered" : "empty"
-  ].join("-");
 
   useEffect(() => {
     const node = wrapperRef.current;
@@ -100,28 +89,27 @@ export function PhotoCanvas({
 
     return () => resizeObserver.disconnect();
   }, [size.width]);
-
   useEffect(() => {
     onReady(stageRef.current);
     return () => onReady(null);
   }, [onReady]);
-
   useEffect(() => {
     if (!sourceUserImage || !maskImage || !templateReady) {
-      setRenderedPhoto(null);
+      setRenderedPhotoCanvas(null);
       return;
     }
 
     let cancelled = false;
-    let objectUrl: string | null = null;
     const frame = window.requestAnimationFrame(() => {
-      const canvas = document.createElement("canvas");
-      canvas.width = size.width;
-      canvas.height = size.height;
+      const canvas = renderCanvasRef.current ?? document.createElement("canvas");
+      if (canvas.width !== size.width || canvas.height !== size.height) {
+        canvas.width = size.width;
+        canvas.height = size.height;
+      }
+      renderCanvasRef.current = canvas;
       const ctx = canvas.getContext("2d");
 
-      if (!ctx) {
-        setRenderedPhoto(null);
+      if (!ctx || cancelled) {
         return;
       }
 
@@ -138,22 +126,13 @@ export function PhotoCanvas({
       ctx.globalCompositeOperation = "destination-in";
       ctx.drawImage(maskImage, 0, 0, size.width, size.height);
       ctx.globalCompositeOperation = "source-over";
-      canvas.toBlob((blob) => {
-        if (!blob || cancelled) {
-          return;
-        }
-
-        objectUrl = URL.createObjectURL(blob);
-        setRenderedPhoto(objectUrl);
-      }, "image/png");
+      setRenderedPhotoCanvas((current) => current ?? canvas);
+      renderedPhotoRef.current?.getLayer()?.batchDraw();
     });
 
     return () => {
       cancelled = true;
       window.cancelAnimationFrame(frame);
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
     };
   }, [
     template.id,
@@ -258,10 +237,10 @@ export function PhotoCanvas({
               {displayTemplateImage ? <KonvaImage image={displayTemplateImage} width={size.width} height={size.height} /> : null}
             </Layer>
             <Layer scaleX={displayScale} scaleY={displayScale}>
-              {userImage && templateReady ? (
+              {renderedPhotoCanvas && templateReady ? (
                 <KonvaImage
-                  key={`rendered-photo-${photoRenderKey}`}
-                  image={userImage}
+                  ref={renderedPhotoRef}
+                  image={renderedPhotoCanvas}
                   width={size.width}
                   height={size.height}
                   listening={false}

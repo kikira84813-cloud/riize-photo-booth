@@ -140,6 +140,30 @@ export default function Home() {
     return templates.find((template) => template.id === selectedId) ?? templates[0];
   }, [selectedId]);
 
+  useEffect(() => {
+    const selectedIndex = templates.findIndex((template) => template.id === selectedTemplate.id);
+    const preloadIndexes = [selectedIndex, selectedIndex - 2, selectedIndex - 1, selectedIndex + 1, selectedIndex + 2].filter(
+      (index) => index >= 0 && index < templates.length
+    );
+    const preloadSources = Array.from(
+      new Set(preloadIndexes.flatMap((index) => [templates[index].file, templates[index].mask, templates[index].thumbnail]))
+    );
+    const preload = () => {
+      preloadSources.forEach((src) => {
+        const image = new Image();
+        image.decoding = "async";
+        image.src = src;
+      });
+    };
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(preload, { timeout: 1200 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timer = window.setTimeout(preload, 120);
+    return () => window.clearTimeout(timer);
+  }, [selectedTemplate.id]);
   const updatePlacement = useCallback((nextPlacement: Placement) => {
     setPlacement(nextPlacement);
   }, []);
