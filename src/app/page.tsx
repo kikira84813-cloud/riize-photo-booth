@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import dynamic from "next/dynamic";
 import type Konva from "konva";
@@ -15,7 +15,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { templates } from "@/data/templates";
 import { WindowFrame } from "@/components/WindowFrame";
 import type { PhotoAdjustments } from "@/components/PhotoCanvas";
-import { autoCutoutPhoto } from "@/utils/autoCutout";
 
 const PhotoCanvas = dynamic(() => import("@/components/PhotoCanvas").then((mod) => mod.PhotoCanvas), {
   ssr: false
@@ -26,8 +25,6 @@ type Placement = {
   y: number;
   scale: number;
 };
-
-type UploadMode = "original" | "cutout";
 
 const defaultPhotoAdjustments: PhotoAdjustments = {
   brightness: 0,
@@ -83,11 +80,6 @@ export default function Home() {
   const [stage, setStage] = useState<Konva.Stage | null>(null);
   const [showLoading, setShowLoading] = useState(true);
   const [loadingLeaving, setLoadingLeaving] = useState(false);
-  const [pendingUpload, setPendingUpload] = useState<string | null>(null);
-  const [uploadMode, setUploadMode] = useState<UploadMode>("original");
-  const [uploadProcessing, setUploadProcessing] = useState(false);
-  const [uploadError, setUploadError] = useState("");
-  const [cutoutPreview, setCutoutPreview] = useState<string | null>(null);
   const photoAdjustmentsRef = useRef<PhotoAdjustments>(defaultPhotoAdjustments);
   const adjustmentFrameRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -166,76 +158,11 @@ export default function Home() {
     }
     const reader = new FileReader();
     reader.onload = () => {
-      setPendingUpload(String(reader.result));
-      setUploadMode("original");
-      setUploadError("");
-      setCutoutPreview(null);
+      setPhoto(String(reader.result));
+      setActiveTab("photo");
     };
     reader.readAsDataURL(file);
   };
-
-  const closeUploadPreview = () => {
-    if (uploadProcessing) {
-      return;
-    }
-    setPendingUpload(null);
-    setUploadError("");
-    setUploadMode("original");
-    setCutoutPreview(null);
-  };
-
-  const selectUploadMode = async (mode: UploadMode) => {
-    setUploadMode(mode);
-    setUploadError("");
-
-    if (mode === "original" || !pendingUpload || cutoutPreview || uploadProcessing) {
-      return;
-    }
-
-    setUploadProcessing(true);
-    try {
-      const nextPreview = await autoCutoutPhoto(pendingUpload);
-      setCutoutPreview(nextPreview);
-    } catch {
-      setUploadError("Auto cutout failed. Original photo can still be used.");
-      setUploadMode("original");
-      setCutoutPreview(null);
-    } finally {
-      setUploadProcessing(false);
-    }
-  };
-
-  const confirmUpload = async () => {
-    if (!pendingUpload || uploadProcessing) {
-      return;
-    }
-
-    let nextPhoto = pendingUpload;
-
-    if (uploadMode === "cutout") {
-      if (cutoutPreview) {
-        nextPhoto = cutoutPreview;
-      } else {
-        setUploadProcessing(true);
-        setUploadError("");
-        try {
-          nextPhoto = await autoCutoutPhoto(pendingUpload);
-        } catch {
-          nextPhoto = pendingUpload;
-          setUploadError("Auto cutout failed. Original photo was used.");
-        } finally {
-          setUploadProcessing(false);
-        }
-      }
-    }
-
-    setPhoto(nextPhoto);
-    setPendingUpload(null);
-    setCutoutPreview(null);
-    setUploadProcessing(false);
-    setActiveTab("photo");
-  };
-
   const captureCamera = () => {
     const video = videoRef.current;
     if (!video) {
@@ -695,58 +622,6 @@ export default function Home() {
             </div>
           </WindowFrame>
         </div>
-
-
-
-        {pendingUpload ? (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/35 p-4">
-            <WindowFrame title="Upload Photo" className="w-full max-w-[520px]" bodyClassName="bg-[#f3f3f3] p-4">
-              <div className="space-y-4">
-                <div className="overflow-hidden border border-black bg-white">
-                  <img src={uploadMode === "cutout" && cutoutPreview ? cutoutPreview : pendingUpload} alt="Uploaded preview" className="max-h-[46vh] w-full object-contain" />
-                </div>
-                <div className="grid grid-cols-2 gap-2 font-pixel text-xs">
-                  <button
-                    type="button"
-                    onClick={() => selectUploadMode("original")}
-                    disabled={uploadProcessing}
-                    className={`min-h-12 border border-black px-2 ${uploadMode === "original" ? "bg-[#b7ff73]" : "bg-white"} disabled:opacity-50`}
-                  >
-                    Use Original
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => selectUploadMode("cutout")}
-                    disabled={uploadProcessing}
-                    className={`min-h-12 border border-black px-2 ${uploadMode === "cutout" ? "bg-[#b7ff73]" : "bg-white"} disabled:opacity-50`}
-                  >
-                    Auto Cutout
-                  </button>
-                </div>
-                {uploadProcessing ? <div className="border border-black bg-[#fffdf0] p-2 font-pixel text-[11px]">Loading cutout model and processing...</div> : null}
-                {uploadError ? <div className="border border-black bg-[#fffdf0] p-2 font-pixel text-[11px]">{uploadError}</div> : null}
-                <div className="flex justify-end gap-2 font-pixel text-xs">
-                  <button
-                    type="button"
-                    onClick={closeUploadPreview}
-                    disabled={uploadProcessing}
-                    className="h-10 border border-black bg-white px-4 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={confirmUpload}
-                    disabled={uploadProcessing}
-                    className="h-10 bg-black px-5 text-white disabled:opacity-50"
-                  >
-                    {uploadProcessing ? "Processing..." : "Use This Photo"}
-                  </button>
-                </div>
-              </div>
-            </WindowFrame>
-          </div>
-        ) : null}
 
         {cameraOpen ? (
           <div className="fixed inset-0 z-40 grid place-items-center bg-black/35 p-4">
