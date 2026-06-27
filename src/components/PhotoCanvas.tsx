@@ -164,7 +164,7 @@ export function PhotoCanvas({
 
   return (
     <div className="relative mx-auto w-full max-w-[760px]">
-      <div ref={wrapperRef} className="mx-auto w-full max-w-[720px]">
+      <div ref={wrapperRef} className="mx-auto w-[88%] max-w-[720px] sm:w-full">
       <div className="relative overflow-hidden rounded-[3px] border border-black bg-white shadow-sticker">
         <Stage
           ref={stageRef}

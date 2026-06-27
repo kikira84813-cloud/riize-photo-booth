@@ -334,9 +334,9 @@ export default function Home() {
           <WindowFrame
             title="Photo Booth"
             className="order-2 self-start lg:order-2 lg:h-[calc(100vh-5rem)]"
-            bodyClassName="bg-[#e9e9e9] p-3 sm:p-6 lg:h-[calc(100%-2rem)] lg:overflow-y-auto"
+            bodyClassName="bg-[#e9e9e9] p-2 sm:p-6 lg:h-[calc(100%-2rem)] lg:overflow-y-auto"
           >
-            <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="mb-2 flex items-center justify-between gap-2 sm:mb-4 sm:gap-3">
               <div className="h-10 w-10" aria-hidden="true" />
               <div className="font-pixel text-xs sm:text-sm">
                 {selectedTemplate.name} {photo ? "/ Drag photo" : "/ Add photo"}
@@ -360,17 +360,17 @@ export default function Home() {
               onReady={setStage}
             />
 
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:mt-5 sm:gap-3">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex h-11 items-center gap-2 rounded-full bg-black px-5 font-pixel text-sm text-white shadow-sticker"
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-black px-4 font-pixel text-xs text-white shadow-sticker sm:h-11 sm:px-5 sm:text-sm"
               >
                 <Upload size={18} />
                 Upload
               </button>
               <button
                 onClick={() => setCameraOpen(true)}
-                className="inline-flex h-11 items-center gap-2 rounded-full border border-black bg-white px-5 font-pixel text-sm shadow-sticker"
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-black bg-white px-4 font-pixel text-xs shadow-sticker sm:h-11 sm:px-5 sm:text-sm"
               >
                 <Camera size={18} />
                 Camera
@@ -378,7 +378,7 @@ export default function Home() {
               <button
                 onClick={exportJpg}
                 disabled={!photo}
-                className="inline-flex h-11 items-center gap-2 rounded-full bg-[#a6ff63] px-5 font-pixel text-sm shadow-sticker disabled:opacity-40"
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#a6ff63] px-4 font-pixel text-xs shadow-sticker disabled:opacity-40 sm:h-11 sm:px-5 sm:text-sm"
               >
                 <Download size={18} />
                 JPG
@@ -399,10 +399,10 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="space-y-4 p-5">
+            <div className="space-y-3 p-3 sm:space-y-4 sm:p-5">
               {activeTab === "template" ? (
                 <>
-                  <div className="border border-black bg-[#fffdf0] p-3 font-pixel text-xs">
+                  <div className="border border-black bg-[#fffdf0] p-2 font-pixel text-xs sm:p-3">
                     Selected file
                     <div className="mt-1 font-sans text-lg font-bold">{selectedTemplate.name}</div>
                   </div>
@@ -422,22 +422,22 @@ export default function Home() {
 
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex h-14 w-full items-center justify-center gap-3 border border-black bg-white font-pixel text-sm shadow-sticker"
+                    className="hidden h-14 w-full items-center justify-center gap-3 border border-black bg-white font-pixel text-sm shadow-sticker sm:flex"
                   >
                     <Upload size={21} />
                     Upload Photo
                   </button>
                   <button
                     onClick={() => setCameraOpen(true)}
-                    className="flex h-14 w-full items-center justify-center gap-3 border border-black bg-[#ffb8dc] font-pixel text-sm shadow-sticker"
+                    className="hidden h-14 w-full items-center justify-center gap-3 border border-black bg-[#ffb8dc] font-pixel text-sm shadow-sticker sm:flex"
                   >
                     <Camera size={21} />
                     Take Photo
                   </button>
-                  <label className="block border border-black bg-[#f3f3f3] p-3 font-pixel text-xs">
+                  <label className="block border border-black bg-[#f3f3f3] p-2 font-pixel text-xs sm:p-3">
                     Scale
                     <input
-                      className="range-retro mt-3 w-full"
+                      className="range-retro mt-2 w-full sm:mt-3"
                       type="range"
                       min="0.05"
                       max="3.5"
@@ -474,7 +474,7 @@ export default function Home() {
                       ))}
                     </div>
                   </div>
-                  <div className="space-y-3 border border-black bg-white p-3 font-pixel text-xs">
+                  <div className="space-y-2 border border-black bg-white p-2 font-pixel text-xs sm:space-y-3 sm:p-3">
                     {adjustmentControls.map((control) => (
                       <label key={control.key} className="block">
                         <span className="flex items-center justify-between gap-3">
