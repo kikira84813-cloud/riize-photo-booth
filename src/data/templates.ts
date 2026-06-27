@@ -1,4 +1,4 @@
-export type SlotMask = "roundedRect" | "oval" | "circle" | "heart";
+﻿export type SlotMask = "roundedRect" | "oval" | "circle" | "heart";
 
 export type PhotoSlot = {
   x: number;
@@ -12,6 +12,7 @@ export type IdolTemplate = {
   id: string;
   name: string;
   file: string;
+  thumbnail: string;
   mask: string;
   overlay: string;
   slot: PhotoSlot;
@@ -139,8 +140,12 @@ export const templates: IdolTemplate[] = templateFiles.map((file, index) => {
     id: `template-${number}`,
     name: file,
     file: `/templates/new/${file}`,
+    thumbnail: `/templates/new/thumbs/template-${number}.jpg`,
     mask: `/templates/new/masks/mask-${number}.png`,
     overlay: `/templates/new/${file}`,
     slot: slots[index]
   };
 });
+
+
+

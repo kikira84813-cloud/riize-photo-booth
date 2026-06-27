@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import dynamic from "next/dynamic";
 import type Konva from "konva";
@@ -323,7 +323,7 @@ export default function Home() {
                   }`}
                 >
                   <div className="mx-auto mb-1 h-11 w-14 overflow-hidden border border-black bg-white shadow-[2px_2px_0_rgba(0,0,0,.28)]">
-                    <img src={template.file} alt="" className="h-full w-full object-cover" />
+                    <img src={template.thumbnail} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   </div>
                     <span className="block truncate">{`Template ${String(index + 1).padStart(2, "0")}`}</span>
                 </button>
@@ -548,5 +548,6 @@ export default function Home() {
     </main>
   );
 }
+
 
 
