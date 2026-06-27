@@ -476,6 +476,13 @@ export default function Home() {
                   </label>
                 ))}
               </div>
+              <button
+                onClick={resetPhoto}
+                className="flex h-9 w-full items-center justify-center gap-2 border border-black bg-white font-pixel text-[11px]"
+              >
+                <RefreshCcw size={15} />
+                Reset Photo
+              </button>
             </div>
           </WindowFrame>
 
