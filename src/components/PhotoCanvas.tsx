@@ -50,11 +50,12 @@ export function PhotoCanvas({
   const displayTemplateImage = templateImage ?? thumbnailImage;
 
   const size = useMemo(() => {
+    const sourceImage = maskImage ?? templateImage ?? overlayImage ?? thumbnailImage;
     return {
-      width: displayTemplateImage?.naturalWidth ?? 1030,
-      height: displayTemplateImage?.naturalHeight ?? 681
+      width: sourceImage?.naturalWidth ?? 1030,
+      height: sourceImage?.naturalHeight ?? 681
     };
-  }, [displayTemplateImage]);
+  }, [maskImage, templateImage, overlayImage, thumbnailImage]);
 
   const displayScale = displayWidth / size.width;
   const displayHeight = size.height * displayScale;
@@ -167,7 +168,7 @@ export function PhotoCanvas({
 
   return (
     <div className="relative mx-auto w-full max-w-[760px]">
-      <div ref={wrapperRef} className="mx-auto w-[74%] max-w-[720px] sm:w-full">
+      <div ref={wrapperRef} className="mx-auto w-[62%] max-w-[720px] sm:w-full">
       <div className="relative overflow-hidden rounded-[3px] border border-black bg-white shadow-sticker">
         <Stage
           ref={stageRef}
@@ -226,4 +227,3 @@ export function PhotoCanvas({
     </div>
   );
 }
-
