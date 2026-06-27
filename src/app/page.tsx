@@ -87,6 +87,7 @@ export default function Home() {
   const [uploadMode, setUploadMode] = useState<UploadMode>("original");
   const [uploadProcessing, setUploadProcessing] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [cutoutPreview, setCutoutPreview] = useState<string | null>(null);
   const photoAdjustmentsRef = useRef<PhotoAdjustments>(defaultPhotoAdjustments);
   const adjustmentFrameRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -168,6 +169,7 @@ export default function Home() {
       setPendingUpload(String(reader.result));
       setUploadMode("original");
       setUploadError("");
+      setCutoutPreview(null);
     };
     reader.readAsDataURL(file);
   };
@@ -179,6 +181,28 @@ export default function Home() {
     setPendingUpload(null);
     setUploadError("");
     setUploadMode("original");
+    setCutoutPreview(null);
+  };
+
+  const selectUploadMode = async (mode: UploadMode) => {
+    setUploadMode(mode);
+    setUploadError("");
+
+    if (mode === "original" || !pendingUpload || cutoutPreview || uploadProcessing) {
+      return;
+    }
+
+    setUploadProcessing(true);
+    try {
+      const nextPreview = await autoCutoutPhoto(pendingUpload);
+      setCutoutPreview(nextPreview);
+    } catch {
+      setUploadError("Auto cutout failed. Original photo can still be used.");
+      setUploadMode("original");
+      setCutoutPreview(null);
+    } finally {
+      setUploadProcessing(false);
+    }
   };
 
   const confirmUpload = async () => {
@@ -186,21 +210,28 @@ export default function Home() {
       return;
     }
 
-    setUploadProcessing(true);
-    setUploadError("");
     let nextPhoto = pendingUpload;
 
     if (uploadMode === "cutout") {
-      try {
-        nextPhoto = await autoCutoutPhoto(pendingUpload);
-      } catch {
-        nextPhoto = pendingUpload;
-        setUploadError("Auto cutout failed. Original photo was used.");
+      if (cutoutPreview) {
+        nextPhoto = cutoutPreview;
+      } else {
+        setUploadProcessing(true);
+        setUploadError("");
+        try {
+          nextPhoto = await autoCutoutPhoto(pendingUpload);
+        } catch {
+          nextPhoto = pendingUpload;
+          setUploadError("Auto cutout failed. Original photo was used.");
+        } finally {
+          setUploadProcessing(false);
+        }
       }
     }
 
     setPhoto(nextPhoto);
     setPendingUpload(null);
+    setCutoutPreview(null);
     setUploadProcessing(false);
     setActiveTab("photo");
   };
@@ -672,12 +703,12 @@ export default function Home() {
             <WindowFrame title="Upload Photo" className="w-full max-w-[520px]" bodyClassName="bg-[#f3f3f3] p-4">
               <div className="space-y-4">
                 <div className="overflow-hidden border border-black bg-white">
-                  <img src={pendingUpload} alt="Uploaded preview" className="max-h-[46vh] w-full object-contain" />
+                  <img src={uploadMode === "cutout" && cutoutPreview ? cutoutPreview : pendingUpload} alt="Uploaded preview" className="max-h-[46vh] w-full object-contain" />
                 </div>
                 <div className="grid grid-cols-2 gap-2 font-pixel text-xs">
                   <button
                     type="button"
-                    onClick={() => setUploadMode("original")}
+                    onClick={() => selectUploadMode("original")}
                     disabled={uploadProcessing}
                     className={`min-h-12 border border-black px-2 ${uploadMode === "original" ? "bg-[#b7ff73]" : "bg-white"} disabled:opacity-50`}
                   >
@@ -685,13 +716,14 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setUploadMode("cutout")}
+                    onClick={() => selectUploadMode("cutout")}
                     disabled={uploadProcessing}
                     className={`min-h-12 border border-black px-2 ${uploadMode === "cutout" ? "bg-[#b7ff73]" : "bg-white"} disabled:opacity-50`}
                   >
                     Auto Cutout
                   </button>
                 </div>
+                {uploadProcessing ? <div className="border border-black bg-[#fffdf0] p-2 font-pixel text-[11px]">Loading cutout model and processing...</div> : null}
                 {uploadError ? <div className="border border-black bg-[#fffdf0] p-2 font-pixel text-[11px]">{uploadError}</div> : null}
                 <div className="flex justify-end gap-2 font-pixel text-xs">
                   <button

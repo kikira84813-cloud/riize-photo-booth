@@ -1,10 +1,13 @@
-﻿const MAX_PROCESS_SIZE = 1400;
+const IMG_LY_MODULE_URL = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/dist/index.mjs";
+const MAX_INPUT_SIZE = 1280;
 
-type Rgb = {
-  r: number;
-  g: number;
-  b: number;
+type RemoveBackground = (source: string | Blob, config?: unknown) => Promise<Blob>;
+
+type ImglyModule = {
+  default: RemoveBackground;
 };
+
+let removeBackgroundPromise: Promise<RemoveBackground> | null = null;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -15,80 +18,64 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function colorDistance(a: Rgb, b: Rgb) {
-  const dr = a.r - b.r;
-  const dg = a.g - b.g;
-  const db = a.b - b.b;
-  return Math.sqrt(dr * dr + dg * dg + db * db);
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error("Canvas export failed."));
+      }
+    }, type, quality);
+  });
 }
 
-function getPixel(data: Uint8ClampedArray, width: number, x: number, y: number): Rgb {
-  const index = (y * width + x) * 4;
-  return { r: data[index], g: data[index + 1], b: data[index + 2] };
-}
-
-function estimateBackground(data: Uint8ClampedArray, width: number, height: number): Rgb {
-  const samples: Rgb[] = [];
-  const sampleCount = 18;
-
-  for (let i = 0; i <= sampleCount; i += 1) {
-    const x = Math.round((width - 1) * (i / sampleCount));
-    const y = Math.round((height - 1) * (i / sampleCount));
-    samples.push(getPixel(data, width, x, 0));
-    samples.push(getPixel(data, width, x, height - 1));
-    samples.push(getPixel(data, width, 0, y));
-    samples.push(getPixel(data, width, width - 1, y));
-  }
-
-  const brightSamples = samples
-    .map((sample) => ({ ...sample, brightness: (sample.r + sample.g + sample.b) / 3 }))
-    .sort((a, b) => b.brightness - a.brightness)
-    .slice(0, Math.max(8, Math.floor(samples.length * 0.45)));
-
-  return brightSamples.reduce(
-    (sum, sample) => ({ r: sum.r + sample.r / brightSamples.length, g: sum.g + sample.g / brightSamples.length, b: sum.b + sample.b / brightSamples.length }),
-    { r: 0, g: 0, b: 0 }
-  );
-}
-
-export async function autoCutoutPhoto(src: string): Promise<string> {
+async function normalizeInput(src: string): Promise<Blob> {
   const image = await loadImage(src);
-  const scale = Math.min(1, MAX_PROCESS_SIZE / Math.max(image.naturalWidth, image.naturalHeight));
+  const scale = Math.min(1, MAX_INPUT_SIZE / Math.max(image.naturalWidth, image.naturalHeight));
   const width = Math.max(1, Math.round(image.naturalWidth * scale));
   const height = Math.max(1, Math.round(image.naturalHeight * scale));
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const ctx = canvas.getContext("2d");
 
   if (!ctx) {
     throw new Error("Canvas is not available.");
   }
 
   ctx.drawImage(image, 0, 0, width, height);
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  const background = estimateBackground(data, width, height);
+  return canvasToBlob(canvas, "image/jpeg", 0.92);
+}
 
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const index = (y * width + x) * 4;
-      const pixel = { r: data[index], g: data[index + 1], b: data[index + 2] };
-      const brightness = (pixel.r + pixel.g + pixel.b) / 3;
-      const distance = colorDistance(pixel, background);
-      const edge = Math.min(x, y, width - 1 - x, height - 1 - y);
-      const edgeBoost = edge < 18 ? 16 : 0;
-      const whiteLike = brightness > 205 && distance < 86 + edgeBoost;
-      const closeToBg = distance < 44 + edgeBoost && brightness > 150;
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Result conversion failed."));
+    reader.readAsDataURL(blob);
+  });
+}
 
-      if (whiteLike || closeToBg) {
-        data[index + 3] = 0;
-      } else if (brightness > 190 && distance < 112) {
-        data[index + 3] = Math.max(70, Math.round((distance - 44) * 3));
-      }
-    }
+async function getRemoveBackground() {
+  if (!removeBackgroundPromise) {
+    removeBackgroundPromise = import(/* webpackIgnore: true */ IMG_LY_MODULE_URL).then((mod) => (mod as ImglyModule).default);
   }
 
-  ctx.putImageData(imageData, 0, 0);
-  return canvas.toDataURL("image/png");
+  return removeBackgroundPromise;
+}
+
+export async function autoCutoutPhoto(src: string): Promise<string> {
+  const removeBackground = await getRemoveBackground();
+  const input = await normalizeInput(src);
+  const result = await removeBackground(input, {
+    model: "isnet_quint8",
+    device: "cpu",
+    output: {
+      format: "image/png",
+      type: "foreground"
+    }
+  });
+
+  return blobToDataUrl(result);
 }
