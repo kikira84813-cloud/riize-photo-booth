@@ -140,6 +140,8 @@ export function PhotoCanvas({
   onReady
 }: PhotoCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
+  const photoImageRef = useRef<Konva.Image>(null);
+  const mobileCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const pinchRef = useRef<{ distance: number; center: { x: number; y: number }; placement: Placement } | null>(null);
   const [displayWidth, setDisplayWidth] = useState(720);
@@ -148,18 +150,16 @@ export function PhotoCanvas({
   const maskImage = useImageElement(template.mask);
   const sourceUserImage = useImageElement(userPhoto);
   const [adjustedPhoto, setAdjustedPhoto] = useState<string | null>(null);
+  const [mobileAdjustedCanvas, setMobileAdjustedCanvas] = useState<HTMLCanvasElement | null>(null);
   const userImage = useImageElement(adjustedPhoto ?? userPhoto);
+  const displayUserImage = mobileAdjustedCanvas ?? userImage;
 
   const displayTemplateImage = templateImage ?? thumbnailImage;
   const templateReady = Boolean(templateImage && maskImage);
   const photoRenderKey = [
     template.id,
     userPhoto ? userPhoto.length : 0,
-    adjustments.brightness,
-    adjustments.contrast,
-    adjustments.saturation,
-    adjustments.hue,
-    adjustedPhoto ? "adjusted" : "original"
+    mobileAdjustedCanvas ? "mobile-adjusted" : adjustedPhoto ? "adjusted" : "original"
   ].join("-");
 
   const size = useMemo(() => {
@@ -197,30 +197,40 @@ export function PhotoCanvas({
   useEffect(() => {
     if (!sourceUserImage || !hasPhotoAdjustments(adjustments)) {
       setAdjustedPhoto(null);
+      setMobileAdjustedCanvas(null);
       return;
     }
 
     let cancelled = false;
     let objectUrl: string | null = null;
     const frame = window.requestAnimationFrame(() => {
-      const canvas = document.createElement("canvas");
+      const usePixelAdjustments = window.matchMedia("(max-width: 768px)").matches;
+      const canvas = usePixelAdjustments ? mobileCanvasRef.current ?? document.createElement("canvas") : document.createElement("canvas");
       canvas.width = sourceUserImage.naturalWidth;
       canvas.height = sourceUserImage.naturalHeight;
       const ctx = canvas.getContext("2d");
 
       if (!ctx) {
         setAdjustedPhoto(null);
+        setMobileAdjustedCanvas(null);
         return;
       }
 
-      const usePixelAdjustments = window.matchMedia("(max-width: 768px)").matches;
       ctx.filter = usePixelAdjustments ? "none" : buildCanvasFilter(adjustments);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(sourceUserImage, 0, 0);
       ctx.filter = "none";
 
       if (usePixelAdjustments) {
         applyPixelAdjustments(ctx, canvas.width, canvas.height, adjustments);
+        mobileCanvasRef.current = canvas;
+        setAdjustedPhoto(null);
+        setMobileAdjustedCanvas((current) => current ?? canvas);
+        photoImageRef.current?.getLayer()?.batchDraw();
+        return;
       }
+
+      setMobileAdjustedCanvas(null);
       canvas.toBlob(
         (blob) => {
           if (!blob || cancelled) {
@@ -331,11 +341,12 @@ export function PhotoCanvas({
             {displayTemplateImage ? <KonvaImage image={displayTemplateImage} width={size.width} height={size.height} /> : null}
           </Layer>
           <Layer scaleX={displayScale} scaleY={displayScale}>
-            {userImage && maskImage && templateReady ? (
+            {displayUserImage && maskImage && templateReady ? (
               <Group key={`photo-layer-${photoRenderKey}`}>
                 <KonvaImage
+                  ref={photoImageRef}
                   key={`photo-${photoRenderKey}`}
-                  image={userImage}
+                  image={displayUserImage}
                   x={placement.x}
                   y={placement.y}
                   scaleX={placement.scale}
