@@ -232,7 +232,7 @@ export function PhotoCanvas({
             {displayTemplateImage ? <KonvaImage image={displayTemplateImage} width={size.width} height={size.height} /> : null}
           </Layer>
           <Layer scaleX={displayScale} scaleY={displayScale}>
-            {userImage && templateReady ? (
+            {userImage && maskImage && templateReady ? (
               <Group key={`photo-layer-${photoRenderKey}`}>
                 <KonvaImage
                   key={`photo-${photoRenderKey}`}

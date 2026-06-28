@@ -165,8 +165,8 @@ export default function Home() {
       return () => window.cancelIdleCallback(idleId);
     }
 
-    const timer = window.setTimeout(preload, 120);
-    return () => window.clearTimeout(timer);
+    const timer = globalThis.setTimeout(preload, 120);
+    return () => globalThis.clearTimeout(timer);
   }, [selectedTemplate.id]);
   const updatePlacement = useCallback((nextPlacement: Placement, immediate = false) => {
     placementRef.current = nextPlacement;
