@@ -30,6 +30,104 @@ function buildCanvasFilter(adjustments: PhotoAdjustments) {
   return `brightness(${brightness}) contrast(${contrast}) saturate(${saturation}) hue-rotate(${adjustments.hue}deg)`;
 }
 
+
+function clampChannel(value: number) {
+  return Math.max(0, Math.min(255, value));
+}
+
+function hueToRgb(p: number, q: number, t: number) {
+  let nextT = t;
+  if (nextT < 0) nextT += 1;
+  if (nextT > 1) nextT -= 1;
+  if (nextT < 1 / 6) return p + (q - p) * 6 * nextT;
+  if (nextT < 1 / 2) return q;
+  if (nextT < 2 / 3) return p + (q - p) * (2 / 3 - nextT) * 6;
+  return p;
+}
+
+function rgbToHsl(r: number, g: number, b: number) {
+  const nextR = r / 255;
+  const nextG = g / 255;
+  const nextB = b / 255;
+  const max = Math.max(nextR, nextG, nextB);
+  const min = Math.min(nextR, nextG, nextB);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case nextR:
+        h = (nextG - nextB) / d + (nextG < nextB ? 6 : 0);
+        break;
+      case nextG:
+        h = (nextB - nextR) / d + 2;
+        break;
+      default:
+        h = (nextR - nextG) / d + 4;
+        break;
+    }
+    h /= 6;
+  }
+
+  return { h, s, l };
+}
+
+function hslToRgb(h: number, s: number, l: number) {
+  if (s === 0) {
+    const gray = l * 255;
+    return { r: gray, g: gray, b: gray };
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return {
+    r: hueToRgb(p, q, h + 1 / 3) * 255,
+    g: hueToRgb(p, q, h) * 255,
+    b: hueToRgb(p, q, h - 1 / 3) * 255
+  };
+}
+
+function applyManualAdjustments(ctx: CanvasRenderingContext2D, width: number, height: number, adjustments: PhotoAdjustments) {
+  if (!hasPhotoAdjustments(adjustments)) {
+    return;
+  }
+
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const { data } = imageData;
+  const brightnessOffset = adjustments.brightness * 255;
+  const contrast = Math.max(0, 1 + adjustments.contrast / 100);
+  const saturation = Math.max(0, 1 + adjustments.saturation);
+  const hueShift = adjustments.hue / 360;
+
+  for (let index = 0; index < data.length; index += 4) {
+    if (data[index + 3] === 0) {
+      continue;
+    }
+
+    let r = clampChannel((data[index] - 128) * contrast + 128 + brightnessOffset);
+    let g = clampChannel((data[index + 1] - 128) * contrast + 128 + brightnessOffset);
+    let b = clampChannel((data[index + 2] - 128) * contrast + 128 + brightnessOffset);
+
+    if (saturation !== 1 || hueShift !== 0) {
+      const hsl = rgbToHsl(r, g, b);
+      const shiftedHue = (hsl.h + hueShift + 1) % 1;
+      const shiftedSaturation = Math.max(0, Math.min(1, hsl.s * saturation));
+      const rgb = hslToRgb(shiftedHue, shiftedSaturation, hsl.l);
+      r = rgb.r;
+      g = rgb.g;
+      b = rgb.b;
+    }
+
+    data[index] = clampChannel(r);
+    data[index + 1] = clampChannel(g);
+    data[index + 2] = clampChannel(b);
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
 type PhotoCanvasProps = {
   template: IdolTemplate;
   userPhoto: string | null;
@@ -122,9 +220,11 @@ export function PhotoCanvas({
       return;
     }
 
+    const useManualFilter = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches;
+
     ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     ctx.clearRect(0, 0, size.width, size.height);
-    ctx.filter = hasPhotoAdjustments(adjustments) ? buildCanvasFilter(adjustments) : "none";
+    ctx.filter = !useManualFilter && hasPhotoAdjustments(adjustments) ? buildCanvasFilter(adjustments) : "none";
     ctx.drawImage(
       sourceUserImage,
       placement.x,
@@ -133,6 +233,11 @@ export function PhotoCanvas({
       sourceUserImage.naturalHeight * placement.scale
     );
     ctx.filter = "none";
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (useManualFilter) {
+      applyManualAdjustments(ctx, canvas.width, canvas.height, adjustments);
+    }
+    ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     ctx.globalCompositeOperation = "destination-in";
     ctx.drawImage(maskImage, 0, 0, size.width, size.height);
     ctx.globalCompositeOperation = "source-over";
