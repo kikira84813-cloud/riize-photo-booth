@@ -23,12 +23,6 @@ function hasPhotoAdjustments(adjustments: PhotoAdjustments) {
   return adjustments.brightness !== 0 || adjustments.contrast !== 0 || adjustments.saturation !== 0 || adjustments.hue !== 0;
 }
 
-function buildCanvasFilter(adjustments: PhotoAdjustments) {
-  const brightness = Math.max(0, 1 + adjustments.brightness);
-  const contrast = Math.max(0, 1 + adjustments.contrast / 100);
-  const saturation = Math.max(0, 1 + adjustments.saturation);
-  return `brightness(${brightness}) contrast(${contrast}) saturate(${saturation}) hue-rotate(${adjustments.hue}deg)`;
-}
 function clampChannel(value: number) {
   return Math.max(0, Math.min(255, value));
 }
@@ -142,6 +136,7 @@ export function PhotoCanvas({
   const stageRef = useRef<Konva.Stage>(null);
   const photoImageRef = useRef<Konva.Image>(null);
   const mobileCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const desktopCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const pinchRef = useRef<{ distance: number; center: { x: number; y: number }; placement: Placement } | null>(null);
   const [displayWidth, setDisplayWidth] = useState(720);
@@ -151,15 +146,16 @@ export function PhotoCanvas({
   const sourceUserImage = useImageElement(userPhoto);
   const [adjustedPhoto, setAdjustedPhoto] = useState<string | null>(null);
   const [mobileAdjustedCanvas, setMobileAdjustedCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [desktopAdjustedCanvas, setDesktopAdjustedCanvas] = useState<HTMLCanvasElement | null>(null);
   const userImage = useImageElement(adjustedPhoto ?? userPhoto);
-  const displayUserImage = mobileAdjustedCanvas ?? userImage;
+  const displayUserImage = mobileAdjustedCanvas ?? desktopAdjustedCanvas ?? userImage;
 
   const displayTemplateImage = templateImage ?? thumbnailImage;
   const templateReady = Boolean(templateImage && maskImage);
   const photoRenderKey = [
     template.id,
     userPhoto ? userPhoto.length : 0,
-    mobileAdjustedCanvas ? "mobile-adjusted" : adjustedPhoto ? "adjusted" : "original"
+    mobileAdjustedCanvas ? "mobile-adjusted" : desktopAdjustedCanvas ? "desktop-adjusted" : adjustedPhoto ? "adjusted" : "original"
   ].join("-");
 
   const size = useMemo(() => {
@@ -198,14 +194,15 @@ export function PhotoCanvas({
     if (!sourceUserImage || !hasPhotoAdjustments(adjustments)) {
       setAdjustedPhoto(null);
       setMobileAdjustedCanvas(null);
+      setDesktopAdjustedCanvas(null);
       return;
     }
 
-    let cancelled = false;
-    let objectUrl: string | null = null;
     const frame = window.requestAnimationFrame(() => {
-      const usePixelAdjustments = window.matchMedia("(max-width: 768px)").matches;
-      const canvas = usePixelAdjustments ? mobileCanvasRef.current ?? document.createElement("canvas") : document.createElement("canvas");
+      const isMobilePreview = window.matchMedia("(max-width: 768px)").matches;
+      const canvas = isMobilePreview
+        ? mobileCanvasRef.current ?? document.createElement("canvas")
+        : desktopCanvasRef.current ?? document.createElement("canvas");
       canvas.width = sourceUserImage.naturalWidth;
       canvas.height = sourceUserImage.naturalHeight;
       const ctx = canvas.getContext("2d");
@@ -213,44 +210,31 @@ export function PhotoCanvas({
       if (!ctx) {
         setAdjustedPhoto(null);
         setMobileAdjustedCanvas(null);
+        setDesktopAdjustedCanvas(null);
         return;
       }
 
-      ctx.filter = usePixelAdjustments ? "none" : buildCanvasFilter(adjustments);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(sourceUserImage, 0, 0);
-      ctx.filter = "none";
+      applyPixelAdjustments(ctx, canvas.width, canvas.height, adjustments);
+      setAdjustedPhoto(null);
 
-      if (usePixelAdjustments) {
-        applyPixelAdjustments(ctx, canvas.width, canvas.height, adjustments);
+      if (isMobilePreview) {
         mobileCanvasRef.current = canvas;
-        setAdjustedPhoto(null);
+        setDesktopAdjustedCanvas(null);
         setMobileAdjustedCanvas((current) => current ?? canvas);
         photoImageRef.current?.getLayer()?.batchDraw();
         return;
       }
 
+      desktopCanvasRef.current = canvas;
       setMobileAdjustedCanvas(null);
-      canvas.toBlob(
-        (blob) => {
-          if (!blob || cancelled) {
-            return;
-          }
-
-          objectUrl = URL.createObjectURL(blob);
-          setAdjustedPhoto(objectUrl);
-        },
-        "image/jpeg",
-        0.92
-      );
+      setDesktopAdjustedCanvas((current) => current ?? canvas);
+      photoImageRef.current?.getLayer()?.batchDraw();
     });
 
     return () => {
-      cancelled = true;
       window.cancelAnimationFrame(frame);
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
     };
   }, [template.id, sourceUserImage, adjustments.brightness, adjustments.contrast, adjustments.saturation, adjustments.hue]);
   useLayoutEffect(() => {
