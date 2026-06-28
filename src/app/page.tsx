@@ -70,6 +70,7 @@ const initialPlacement: Placement = { x: 0, y: 0, scale: 1 };
 
 const MAX_PHOTO_SIDE = 1600;
 const MOBILE_MAX_PHOTO_SIDE = 900;
+const REMOVE_BG_MAX_SIDE = 1024;
 
 function hasPhotoAdjustments(adjustments: PhotoAdjustments) {
   return adjustments.brightness !== 0 || adjustments.contrast !== 0 || adjustments.saturation !== 0 || adjustments.hue !== 0;
@@ -197,6 +198,34 @@ function canvasToJpeg(canvas: HTMLCanvasElement, quality = 0.9): Promise<string>
   });
 }
 
+
+async function compressPhotoForRemoveBg(src: string) {
+  const image = await loadPhotoImage(src);
+  const scale = Math.min(1, REMOVE_BG_MAX_SIDE / Math.max(image.naturalWidth, image.naturalHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) {
+    return null;
+  }
+
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  return new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.88);
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Photo conversion failed."));
+    reader.readAsDataURL(blob);
+  });
+}
 async function normalizeUserPhoto(src: string) {
   const image = await loadPhotoImage(src);
   const maxPhotoSide = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches ? MOBILE_MAX_PHOTO_SIDE : MAX_PHOTO_SIDE;
@@ -222,6 +251,9 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState(templates[0].id);
   const [photo, setPhoto] = useState<string | null>(null);
   const [exportPhoto, setExportPhoto] = useState<string | null>(null);
+  const [uploadedPhotoSource, setUploadedPhotoSource] = useState<string | null>(null);
+  const [removeBgBusy, setRemoveBgBusy] = useState(false);
+  const [removeBgNote, setRemoveBgNote] = useState("");
   const [placement, setPlacement] = useState<Placement>(initialPlacement);
   const [photoAdjustments, setPhotoAdjustments] = useState<PhotoAdjustments>(defaultPhotoAdjustments);
   const [activeTab, setActiveTab] = useState<"template" | "photo" | "export">("template");
@@ -363,6 +395,8 @@ export default function Home() {
       const nextPhoto = String(reader.result);
       setPlacement(initialPlacement);
       setExportPhoto(nextPhoto);
+      setUploadedPhotoSource(nextPhoto);
+      setRemoveBgNote("");
       try {
         setPhoto(await normalizeUserPhoto(nextPhoto));
       } catch {
@@ -391,6 +425,8 @@ export default function Home() {
     const nextPhoto = canvas.toDataURL("image/jpeg", 0.92);
     setPlacement(initialPlacement);
     setExportPhoto(nextPhoto);
+    setUploadedPhotoSource(null);
+    setRemoveBgNote("");
     try {
       setPhoto(await normalizeUserPhoto(nextPhoto));
     } catch {
@@ -404,6 +440,51 @@ export default function Home() {
     setPlacement(initialPlacement);
     setPhoto(null);
     setExportPhoto(null);
+    setUploadedPhotoSource(null);
+    setRemoveBgNote("");
+  };
+
+  const removeBackground = async () => {
+    if (!uploadedPhotoSource || removeBgBusy) {
+      return;
+    }
+
+    setRemoveBgBusy(true);
+    setRemoveBgNote("");
+
+    try {
+      const imageBlob = await compressPhotoForRemoveBg(uploadedPhotoSource);
+      if (!imageBlob) {
+        throw new Error("Photo compression failed.");
+      }
+
+      const formData = new FormData();
+      formData.append("image", imageBlob, "photo.jpg");
+
+      const response = await fetch("/api/remove-bg", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error("Background removal failed.");
+      }
+
+      const resultBlob = await response.blob();
+      if (!resultBlob.type.includes("png")) {
+        throw new Error("Unexpected background removal response.");
+      }
+
+      const resultPhoto = await blobToDataUrl(resultBlob);
+      setPlacement(initialPlacement);
+      setPhoto(resultPhoto);
+      setExportPhoto(resultPhoto);
+      setRemoveBgNote("Background removed.");
+    } catch {
+      setRemoveBgNote("Background removal failed. Using original image.");
+    } finally {
+      setRemoveBgBusy(false);
+    }
   };
   const updatePhotoAdjustment = (key: keyof PhotoAdjustments, value: number) => {
     const nextAdjustments = { ...photoAdjustmentsRef.current, [key]: value };
@@ -757,6 +838,19 @@ export default function Home() {
                   </label>
                 ))}
               </div>
+              {uploadedPhotoSource ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={removeBackground}
+                    disabled={removeBgBusy}
+                    className="flex h-9 w-full items-center justify-center gap-2 border border-black bg-[#fffdf0] font-pixel text-[11px] disabled:opacity-40"
+                  >
+                    {removeBgBusy ? "Removing..." : "Remove Background (Beta)"}
+                  </button>
+                  {removeBgNote ? <div className="font-pixel text-[10px] leading-relaxed">{removeBgNote}</div> : null}
+                </>
+              ) : null}
               <button
                 onClick={resetPhoto}
                 className="flex h-9 w-full items-center justify-center gap-2 border border-black bg-white font-pixel text-[11px]"
@@ -808,6 +902,19 @@ export default function Home() {
                     <Upload size={21} />
                     Upload Photo
                   </button>
+                  {uploadedPhotoSource ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={removeBackground}
+                        disabled={removeBgBusy}
+                        className="hidden h-11 w-full items-center justify-center gap-3 border border-black bg-[#fffdf0] font-pixel text-xs shadow-sticker disabled:opacity-40 sm:flex"
+                      >
+                        {removeBgBusy ? "Removing..." : "Remove Background (Beta)"}
+                      </button>
+                      {removeBgNote ? <div className="font-pixel text-[10px] leading-relaxed">{removeBgNote}</div> : null}
+                    </>
+                  ) : null}
                   <button
                     onClick={() => setCameraOpen(true)}
                     className="hidden h-14 w-full items-center justify-center gap-3 border border-black bg-[#ffb8dc] font-pixel text-sm shadow-sticker sm:flex"
