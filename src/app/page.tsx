@@ -722,16 +722,16 @@ export default function Home() {
           <WindowFrame
             title="Photo Booth"
             className="order-2 self-start lg:order-2 lg:h-[calc(100vh-5rem)]"
-            bodyClassName="bg-[#e9e9e9] p-2 sm:p-6 lg:h-[calc(100%-2rem)] lg:overflow-y-auto"
+            bodyClassName="bg-[#e9e9e9] p-1.5 sm:p-6 lg:h-[calc(100%-2rem)] lg:overflow-y-auto"
           >
-            <div className="mb-2 flex items-center justify-between gap-2 sm:mb-4 sm:gap-3">
-              <div className="h-10 w-10" aria-hidden="true" />
+            <div className="mb-1 flex items-center justify-between gap-1.5 sm:mb-4 sm:gap-3">
+              <div className="h-8 w-8 sm:h-10 sm:w-10" aria-hidden="true" />
               <div className="font-pixel text-xs sm:text-sm">
                 {selectedTemplate.name} {photo ? "/ Drag photo" : "/ Add photo"}
               </div>
               <button
                 onClick={exportJpg}
-                className="grid h-10 w-10 place-items-center rounded-full bg-black text-white shadow-sticker disabled:opacity-40"
+                className="grid h-8 w-8 place-items-center rounded-full bg-black text-white shadow-sticker disabled:opacity-40 sm:h-10 sm:w-10"
                 disabled={!photo}
                 aria-label="Download JPG"
               >
@@ -748,17 +748,17 @@ export default function Home() {
               onReady={setStage}
             />
 
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:mt-5 sm:gap-3">
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 sm:mt-5 sm:gap-3">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex h-10 items-center gap-2 rounded-full bg-black px-4 font-pixel text-xs text-white shadow-sticker sm:h-11 sm:px-5 sm:text-sm"
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-black px-3 font-pixel text-[11px] text-white shadow-sticker sm:h-11 sm:gap-2 sm:px-5 sm:text-sm"
               >
                 <Upload size={18} />
                 Upload
               </button>
               <button
                 onClick={() => setCameraOpen(true)}
-                className="inline-flex h-10 items-center gap-2 rounded-full border border-black bg-white px-4 font-pixel text-xs shadow-sticker sm:h-11 sm:px-5 sm:text-sm"
+                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-black bg-white px-3 font-pixel text-[11px] shadow-sticker sm:h-11 sm:gap-2 sm:px-5 sm:text-sm"
               >
                 <Camera size={18} />
                 Camera
@@ -766,21 +766,21 @@ export default function Home() {
               <button
                 onClick={exportJpg}
                 disabled={!photo}
-                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#a6ff63] px-4 font-pixel text-xs shadow-sticker disabled:opacity-40 sm:h-11 sm:px-5 sm:text-sm"
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#a6ff63] px-3 font-pixel text-[11px] shadow-sticker disabled:opacity-40 sm:h-11 sm:gap-2 sm:px-5 sm:text-sm"
               >
                 <Download size={18} />
                 JPG
               </button>
             </div>
 
-            <div className="mt-3 space-y-2 border-t border-black/20 pt-3 sm:hidden">
-              <label className="block border border-black bg-[#f3f3f3] p-2 font-pixel text-[11px]">
+            <div className="mt-2 space-y-1.5 border-t border-black/20 pt-2 sm:hidden">
+              <label className="block border border-black bg-[#f3f3f3] p-1.5 font-pixel text-[10px]">
                 <span className="flex items-center justify-between gap-3">
                   <span>Scale</span>
                   <span>{Math.round(placement.scale * 100)}%</span>
                 </span>
                 <input
-                  className="range-retro mt-1 w-full"
+                  className="range-retro mt-0.5 w-full"
                   type="range"
                   min="0.05"
                   max="3.5"
@@ -791,8 +791,8 @@ export default function Home() {
                       onChange={(event) => updatePlacement({ ...placementRef.current, scale: Number(event.target.value) }, true)}
                 />
               </label>
-              <div className="border border-black bg-[#fffdf0] p-2 font-pixel text-[11px]">
-                <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="border border-black bg-[#fffdf0] p-1.5 font-pixel text-[10px]">
+                <div className="mb-1.5 flex items-center justify-between gap-2">
                   <span>Filter Presets</span>
                   <button
                     type="button"
@@ -810,17 +810,17 @@ export default function Home() {
                       type="button"
                       onClick={() => applyPhotoAdjustments(preset.adjustments)}
                       disabled={!photo}
-                      className="min-h-8 border border-black bg-white px-1 py-1 text-[9px] shadow-[1px_1px_0_rgba(0,0,0,.18)] disabled:opacity-40"
+                      className="min-h-7 border border-black bg-white px-1 py-0.5 text-[8px] shadow-[1px_1px_0_rgba(0,0,0,.18)] disabled:opacity-40"
                     >
                       {preset.name}
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 border border-black bg-white p-2 font-pixel text-[10px]">
+              <div className="grid grid-cols-2 gap-1.5 border border-black bg-white p-1.5 font-pixel text-[9px]">
                 {adjustmentControls.map((control) => (
                   <label key={control.key} className="block">
-                    <span className="mb-1 flex items-center justify-between gap-2">
+                    <span className="mb-0.5 flex items-center justify-between gap-2">
                       <span>{control.label}</span>
                       <span>{control.display(photoAdjustments[control.key])}</span>
                     </span>
@@ -844,7 +844,7 @@ export default function Home() {
                     type="button"
                     onClick={removeBackground}
                     disabled={removeBgBusy}
-                    className="flex h-9 w-full items-center justify-center gap-2 border border-black bg-[#fffdf0] font-pixel text-[11px] disabled:opacity-40"
+                    className="flex h-8 w-full items-center justify-center gap-2 border border-black bg-[#fffdf0] font-pixel text-[10px] disabled:opacity-40"
                   >
                     {removeBgBusy ? "Removing..." : "Remove Background (Beta)"}
                   </button>
@@ -853,7 +853,7 @@ export default function Home() {
               ) : null}
               <button
                 onClick={resetPhoto}
-                className="flex h-9 w-full items-center justify-center gap-2 border border-black bg-white font-pixel text-[11px]"
+                className="flex h-8 w-full items-center justify-center gap-2 border border-black bg-white font-pixel text-[10px]"
               >
                 <RefreshCcw size={15} />
                 Reset Photo
