@@ -71,6 +71,104 @@ const initialPlacement: Placement = { x: 0, y: 0, scale: 1 };
 const MAX_PHOTO_SIDE = 1600;
 const MOBILE_MAX_PHOTO_SIDE = 900;
 
+function hasPhotoAdjustments(adjustments: PhotoAdjustments) {
+  return adjustments.brightness !== 0 || adjustments.contrast !== 0 || adjustments.saturation !== 0 || adjustments.hue !== 0;
+}
+
+function clampChannel(value: number) {
+  return Math.max(0, Math.min(255, value));
+}
+
+function hueToRgb(p: number, q: number, t: number) {
+  let nextT = t;
+  if (nextT < 0) nextT += 1;
+  if (nextT > 1) nextT -= 1;
+  if (nextT < 1 / 6) return p + (q - p) * 6 * nextT;
+  if (nextT < 1 / 2) return q;
+  if (nextT < 2 / 3) return p + (q - p) * (2 / 3 - nextT) * 6;
+  return p;
+}
+
+function rgbToHsl(r: number, g: number, b: number) {
+  const nextR = r / 255;
+  const nextG = g / 255;
+  const nextB = b / 255;
+  const max = Math.max(nextR, nextG, nextB);
+  const min = Math.min(nextR, nextG, nextB);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case nextR:
+        h = (nextG - nextB) / d + (nextG < nextB ? 6 : 0);
+        break;
+      case nextG:
+        h = (nextB - nextR) / d + 2;
+        break;
+      default:
+        h = (nextR - nextG) / d + 4;
+        break;
+    }
+    h /= 6;
+  }
+
+  return { h, s, l };
+}
+
+function hslToRgb(h: number, s: number, l: number) {
+  if (s === 0) {
+    const gray = l * 255;
+    return { r: gray, g: gray, b: gray };
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return {
+    r: hueToRgb(p, q, h + 1 / 3) * 255,
+    g: hueToRgb(p, q, h) * 255,
+    b: hueToRgb(p, q, h - 1 / 3) * 255
+  };
+}
+
+function applyPixelAdjustments(ctx: CanvasRenderingContext2D, width: number, height: number, adjustments: PhotoAdjustments) {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const { data } = imageData;
+  const brightnessOffset = adjustments.brightness * 255;
+  const contrast = Math.max(0, 1 + adjustments.contrast / 100);
+  const saturation = Math.max(0, 1 + adjustments.saturation);
+  const hueShift = adjustments.hue / 360;
+
+  for (let index = 0; index < data.length; index += 4) {
+    if (data[index + 3] === 0) {
+      continue;
+    }
+
+    let r = clampChannel((data[index] - 128) * contrast + 128 + brightnessOffset);
+    let g = clampChannel((data[index + 1] - 128) * contrast + 128 + brightnessOffset);
+    let b = clampChannel((data[index + 2] - 128) * contrast + 128 + brightnessOffset);
+
+    if (saturation !== 1 || hueShift !== 0) {
+      const hsl = rgbToHsl(r, g, b);
+      const shiftedHue = (hsl.h + hueShift + 1) % 1;
+      const shiftedSaturation = Math.max(0, Math.min(1, hsl.s * saturation));
+      const rgb = hslToRgb(shiftedHue, shiftedSaturation, hsl.l);
+      r = rgb.r;
+      g = rgb.g;
+      b = rgb.b;
+    }
+
+    data[index] = clampChannel(r);
+    data[index + 1] = clampChannel(g);
+    data[index + 2] = clampChannel(b);
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
 function loadPhotoImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -123,6 +221,7 @@ async function normalizeUserPhoto(src: string) {
 export default function Home() {
   const [selectedId, setSelectedId] = useState(templates[0].id);
   const [photo, setPhoto] = useState<string | null>(null);
+  const [exportPhoto, setExportPhoto] = useState<string | null>(null);
   const [placement, setPlacement] = useState<Placement>(initialPlacement);
   const [photoAdjustments, setPhotoAdjustments] = useState<PhotoAdjustments>(defaultPhotoAdjustments);
   const [activeTab, setActiveTab] = useState<"template" | "photo" | "export">("template");
@@ -263,6 +362,7 @@ export default function Home() {
     reader.onload = async () => {
       const nextPhoto = String(reader.result);
       setPlacement(initialPlacement);
+      setExportPhoto(nextPhoto);
       try {
         setPhoto(await normalizeUserPhoto(nextPhoto));
       } catch {
@@ -290,6 +390,7 @@ export default function Home() {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const nextPhoto = canvas.toDataURL("image/jpeg", 0.92);
     setPlacement(initialPlacement);
+    setExportPhoto(nextPhoto);
     try {
       setPhoto(await normalizeUserPhoto(nextPhoto));
     } catch {
@@ -302,6 +403,7 @@ export default function Home() {
   const resetPhoto = () => {
     setPlacement(initialPlacement);
     setPhoto(null);
+    setExportPhoto(null);
   };
   const updatePhotoAdjustment = (key: keyof PhotoAdjustments, value: number) => {
     const nextAdjustments = { ...photoAdjustmentsRef.current, [key]: value };
@@ -326,17 +428,78 @@ export default function Home() {
     applyPhotoAdjustments(defaultPhotoAdjustments);
   };
 
-  const exportJpg = () => {
-    if (!stage) {
+  const exportJpg = async () => {
+    if (!photo) {
       return;
     }
-    const uri = stage.toDataURL({ pixelRatio: 2, mimeType: "image/jpeg", quality: 0.92 });
-    const link = document.createElement("a");
-    link.download = `${selectedTemplate.id}-photo-booth.jpg`;
-    link.href = uri;
-    link.click();
-    setDownloadNote("Downloaded JPG to your browser.");
-    window.setTimeout(() => setDownloadNote(""), 2400);
+
+    try {
+      const [templateImage, maskImage, previewImage, originalImage] = await Promise.all([
+        loadPhotoImage(selectedTemplate.file),
+        loadPhotoImage(selectedTemplate.mask),
+        loadPhotoImage(photo),
+        loadPhotoImage(exportPhoto ?? photo)
+      ]);
+      const width = maskImage.naturalWidth || templateImage.naturalWidth;
+      const height = maskImage.naturalHeight || templateImage.naturalHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        return;
+      }
+
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(templateImage, 0, 0, width, height);
+
+      const photoCanvas = document.createElement("canvas");
+      photoCanvas.width = width;
+      photoCanvas.height = height;
+      const photoCtx = photoCanvas.getContext("2d");
+
+      if (!photoCtx) {
+        return;
+      }
+
+      photoCtx.drawImage(
+        originalImage,
+        placement.x,
+        placement.y,
+        previewImage.naturalWidth * placement.scale,
+        previewImage.naturalHeight * placement.scale
+      );
+      if (hasPhotoAdjustments(photoAdjustmentsRef.current)) {
+        applyPixelAdjustments(photoCtx, width, height, photoAdjustmentsRef.current);
+      }
+      photoCtx.globalCompositeOperation = "destination-in";
+      photoCtx.drawImage(maskImage, 0, 0, width, height);
+      photoCtx.globalCompositeOperation = "source-over";
+
+      ctx.drawImage(photoCanvas, 0, 0);
+      ctx.drawImage(templateImage, 0, 0, width, height);
+
+      const uri = canvas.toDataURL("image/jpeg", 0.96);
+      const link = document.createElement("a");
+      link.download = `${selectedTemplate.id}-photo-booth.jpg`;
+      link.href = uri;
+      link.click();
+      setDownloadNote("Downloaded JPG to your browser.");
+      window.setTimeout(() => setDownloadNote(""), 2400);
+    } catch {
+      if (!stage) {
+        return;
+      }
+      const uri = stage.toDataURL({ pixelRatio: 2, mimeType: "image/jpeg", quality: 0.92 });
+      const link = document.createElement("a");
+      link.download = `${selectedTemplate.id}-photo-booth.jpg`;
+      link.href = uri;
+      link.click();
+      setDownloadNote("Downloaded JPG to your browser.");
+      window.setTimeout(() => setDownloadNote(""), 2400);
+    }
   };
 
   return (
