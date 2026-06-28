@@ -328,6 +328,7 @@ export function PhotoCanvas({
       <div ref={wrapperRef} className="mx-auto w-[62%] max-w-[720px] sm:w-full">
       <div className="relative overflow-hidden rounded-[3px] border border-black bg-white shadow-sticker">
         <Stage
+          key={`stage-${template.id}`}
           ref={stageRef}
           width={displayWidth}
           height={displayHeight}
@@ -340,7 +341,7 @@ export function PhotoCanvas({
             <Rect width={size.width} height={size.height} fill="#fff" />
             {displayTemplateImage ? <KonvaImage image={displayTemplateImage} width={size.width} height={size.height} /> : null}
           </Layer>
-          <Layer scaleX={displayScale} scaleY={displayScale}>
+          <Layer key={`photo-layer-${template.id}`} scaleX={displayScale} scaleY={displayScale}>
             {displayUserImage && maskImage && templateReady ? (
               <Group key={`photo-layer-${photoRenderKey}`}>
                 <KonvaImage
