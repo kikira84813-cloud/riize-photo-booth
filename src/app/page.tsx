@@ -415,6 +415,11 @@ export default function Home() {
       stopCamera();
     };
   }, [cameraOpen, clearCameraCountdown, stopCamera]);
+  useEffect(() => {
+    if (cameraOpen && !cameraSnapshot && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [cameraOpen, cameraSnapshot]);
 
   const handleUpload = (file?: File) => {
     if (!file) {
