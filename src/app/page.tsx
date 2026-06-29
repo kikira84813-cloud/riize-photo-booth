@@ -259,6 +259,8 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<"template" | "photo" | "export">("template");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [cameraSnapshot, setCameraSnapshot] = useState<string | null>(null);
+  const [cameraCountdown, setCameraCountdown] = useState<number | null>(null);
   const [downloadNote, setDownloadNote] = useState("");
   const [stage, setStage] = useState<Konva.Stage | null>(null);
   const [showLoading, setShowLoading] = useState(true);
@@ -270,10 +272,16 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const cameraCountdownRef = useRef<number | null>(null);
 
   const selectedTemplate = useMemo(() => {
     return templates.find((template) => template.id === selectedId) ?? templates[0];
   }, [selectedId]);
+
+  const cameraAspectRatio = useMemo(() => {
+    const ratio = selectedTemplate.slot.width / selectedTemplate.slot.height;
+    return Number.isFinite(ratio) && ratio > 0 ? ratio : 16 / 9;
+  }, [selectedTemplate.slot.height, selectedTemplate.slot.width]);
 
   useEffect(() => {
     const selectedIndex = templates.findIndex((template) => template.id === selectedTemplate.id);
@@ -341,10 +349,19 @@ export default function Home() {
     };
   }, []);
 
+  const clearCameraCountdown = useCallback(() => {
+    if (cameraCountdownRef.current !== null) {
+      window.clearInterval(cameraCountdownRef.current);
+      cameraCountdownRef.current = null;
+    }
+    setCameraCountdown(null);
+  }, []);
+
   const stopCamera = useCallback(() => {
+    clearCameraCountdown();
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
-  }, []);
+  }, [clearCameraCountdown]);
 
   useEffect(() => {
     const leaveTimer = window.setTimeout(() => setLoadingLeaving(true), 1800);
@@ -363,6 +380,8 @@ export default function Home() {
 
     let cancelled = false;
     setCameraError("");
+    setCameraSnapshot(null);
+    clearCameraCountdown();
 
     navigator.mediaDevices
       .getUserMedia({ video: { facingMode: "user" }, audio: false })
@@ -384,7 +403,7 @@ export default function Home() {
       cancelled = true;
       stopCamera();
     };
-  }, [cameraOpen, stopCamera]);
+  }, [cameraOpen, clearCameraCountdown, stopCamera]);
 
   const handleUpload = (file?: File) => {
     if (!file) {
@@ -406,23 +425,78 @@ export default function Home() {
     };
     reader.readAsDataURL(file);
   };
-  const captureCamera = async () => {
+  const captureCameraFrame = useCallback(() => {
     const video = videoRef.current;
     if (!video) {
-      return;
+      return null;
+    }
+
+    const videoWidth = video.videoWidth || 1280;
+    const videoHeight = video.videoHeight || 720;
+    const videoRatio = videoWidth / videoHeight;
+    let sourceX = 0;
+    let sourceY = 0;
+    let sourceWidth = videoWidth;
+    let sourceHeight = videoHeight;
+
+    if (videoRatio > cameraAspectRatio) {
+      sourceWidth = videoHeight * cameraAspectRatio;
+      sourceX = (videoWidth - sourceWidth) / 2;
+    } else {
+      sourceHeight = videoWidth / cameraAspectRatio;
+      sourceY = (videoHeight - sourceHeight) / 2;
     }
 
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    canvas.width = Math.max(1, Math.round(sourceWidth));
+    canvas.height = Math.max(1, Math.round(sourceHeight));
     const ctx = canvas.getContext("2d");
     if (!ctx) {
-      return;
+      return null;
     }
+
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const nextPhoto = canvas.toDataURL("image/jpeg", 0.92);
+    ctx.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
+
+    return canvas.toDataURL("image/jpeg", 0.92);
+  }, [cameraAspectRatio]);
+
+  const freezeCameraFrame = useCallback(() => {
+    const nextSnapshot = captureCameraFrame();
+    if (nextSnapshot) {
+      setCameraSnapshot(nextSnapshot);
+    }
+  }, [captureCameraFrame]);
+
+  const startCameraCountdown = useCallback(() => {
+    clearCameraCountdown();
+    setCameraSnapshot(null);
+    setCameraCountdown(10);
+    cameraCountdownRef.current = window.setInterval(() => {
+      setCameraCountdown((current) => {
+        if (current === null) {
+          return null;
+        }
+        if (current <= 1) {
+          if (cameraCountdownRef.current !== null) {
+            window.clearInterval(cameraCountdownRef.current);
+            cameraCountdownRef.current = null;
+          }
+          window.setTimeout(freezeCameraFrame, 0);
+          return null;
+        }
+        return current - 1;
+      });
+    }, 1000);
+  }, [clearCameraCountdown, freezeCameraFrame]);
+
+  const captureCamera = async () => {
+    const nextPhoto = cameraSnapshot ?? captureCameraFrame();
+    if (!nextPhoto) {
+      return;
+    }
+
     setPlacement(initialPlacement);
     setExportPhoto(nextPhoto);
     setUploadedPhotoSource(null);
@@ -433,9 +507,10 @@ export default function Home() {
       setPhoto(nextPhoto);
     }
     setCameraOpen(false);
+    setCameraSnapshot(null);
+    clearCameraCountdown();
     setActiveTab("photo");
   };
-
   const resetPhoto = () => {
     setPlacement(initialPlacement);
     setPhoto(null);
@@ -1020,13 +1095,41 @@ export default function Home() {
               {cameraError ? (
                 <div className="border border-black bg-white p-5 font-pixel text-sm">{cameraError}</div>
               ) : (
-                <video ref={videoRef} autoPlay playsInline muted className="aspect-video w-full scale-x-[-1] border border-black bg-black object-cover" />
+                <div className="relative w-full overflow-hidden border border-black bg-black" style={{ aspectRatio: String(cameraAspectRatio) }}>
+                  {cameraSnapshot ? (
+                    <img src={cameraSnapshot} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <video ref={videoRef} autoPlay playsInline muted className="h-full w-full scale-x-[-1] object-cover" />
+                  )}
+                  {cameraCountdown !== null ? (
+                    <div className="absolute inset-0 grid place-items-center bg-black/25 font-pixel text-5xl text-white">{cameraCountdown}</div>
+                  ) : null}
+                </div>
               )}
-              <div className="mt-4 flex justify-end gap-3">
+              <div className="mt-4 flex flex-wrap justify-end gap-3">
                 <button onClick={() => setCameraOpen(false)} className="h-10 border border-black bg-white px-4 font-pixel text-sm">
                   Cancel
                 </button>
-                <button onClick={captureCamera} className="h-10 bg-black px-5 font-pixel text-sm text-white">
+                <button
+                  onClick={freezeCameraFrame}
+                  disabled={Boolean(cameraSnapshot) || Boolean(cameraError)}
+                  className="h-10 border border-black bg-white px-4 font-pixel text-sm disabled:opacity-40"
+                >
+                  Capture
+                </button>
+                <button
+                  onClick={startCameraCountdown}
+                  disabled={cameraCountdown !== null || Boolean(cameraSnapshot) || Boolean(cameraError)}
+                  className="h-10 border border-black bg-white px-4 font-pixel text-sm disabled:opacity-40"
+                >
+                  10s Timer
+                </button>
+                {cameraSnapshot ? (
+                  <button onClick={() => setCameraSnapshot(null)} className="h-10 border border-black bg-white px-4 font-pixel text-sm">
+                    Retake
+                  </button>
+                ) : null}
+                <button onClick={captureCamera} disabled={Boolean(cameraError)} className="h-10 bg-black px-5 font-pixel text-sm text-white disabled:opacity-40">
                   Use Photo
                 </button>
               </div>
