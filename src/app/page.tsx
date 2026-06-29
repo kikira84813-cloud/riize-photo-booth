@@ -1106,7 +1106,7 @@ export default function Home() {
               {cameraError ? (
                 <div className="border border-black bg-white p-5 font-pixel text-sm">{cameraError}</div>
               ) : (
-                <div className="relative w-full overflow-hidden border border-black bg-black" style={{ aspectRatio: String(cameraAspectRatio) }}>
+                <div className="relative mx-auto w-full overflow-hidden border border-black bg-black" style={{ aspectRatio: String(cameraAspectRatio), maxHeight: "64vh", maxWidth: `calc(64vh * ${cameraAspectRatio})` }}>
                   {cameraSnapshot ? (
                     <img src={cameraSnapshot} alt="" className="h-full w-full object-cover" />
                   ) : (
