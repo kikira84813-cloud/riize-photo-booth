@@ -68,6 +68,18 @@ const adjustmentControls: Array<{
 
 const initialPlacement: Placement = { x: 0, y: 0, scale: 1 };
 
+const DEFAULT_CAMERA_ASPECT_RATIO = 3 / 2;
+const CAMERA_TEMPLATE_ASPECT_RATIOS: Record<string, number> = {
+  "template-01": 1027 / 685,
+  "template-02": 2294 / 3367,
+  "template-03": 579 / 1024,
+  "template-04": 2 / 3,
+  "template-05": 3920 / 3000,
+  "template-06": 3271 / 2502,
+  "template-07": 1020 / 1359,
+  "template-08": 2 / 3
+};
+
 const MAX_PHOTO_SIDE = 1600;
 const MOBILE_MAX_PHOTO_SIDE = 900;
 const REMOVE_BG_MAX_SIDE = 1024;
@@ -279,9 +291,8 @@ export default function Home() {
   }, [selectedId]);
 
   const cameraAspectRatio = useMemo(() => {
-    const ratio = selectedTemplate.slot.width / selectedTemplate.slot.height;
-    return Number.isFinite(ratio) && ratio > 0 ? ratio : 16 / 9;
-  }, [selectedTemplate.slot.height, selectedTemplate.slot.width]);
+    return CAMERA_TEMPLATE_ASPECT_RATIOS[selectedTemplate.id] ?? DEFAULT_CAMERA_ASPECT_RATIO;
+  }, [selectedTemplate.id]);
 
   useEffect(() => {
     const selectedIndex = templates.findIndex((template) => template.id === selectedTemplate.id);
