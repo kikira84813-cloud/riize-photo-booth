@@ -15,6 +15,8 @@ export type IdolTemplate = {
   thumbnail: string;
   mask: string;
   overlay: string;
+  exportFile?: string;
+  exportMask?: string;
   slot: PhotoSlot;
 };
 
@@ -148,14 +150,18 @@ const slots: Array<PhotoSlot> = [
 
 export const templates: IdolTemplate[] = templateFiles.map((file, index) => {
   const number = String(index + 1).padStart(2, "0");
-  const templateFile = index >= 55 ? `/templates/new/${file}` : `/templates/new/optimized/template-${number}.webp`;
+  const isNewTemplate = index >= 55;
+  const templateFile = `/templates/new/optimized/template-${number}.webp`;
+  const templateMask = isNewTemplate ? `/templates/new/masks/optimized/mask-${number}.png` : `/templates/new/masks/mask-${number}.png`;
   return {
     id: `template-${number}`,
     name: file,
     file: templateFile,
     thumbnail: `/templates/new/thumbs/template-${number}.jpg`,
-    mask: `/templates/new/masks/mask-${number}.png`,
+    mask: templateMask,
     overlay: templateFile,
+    exportFile: isNewTemplate ? `/templates/new/export/template-${number}.webp` : undefined,
+    exportMask: isNewTemplate ? `/templates/new/masks/export/mask-${number}.png` : undefined,
     slot: slots[index]
   };
 });

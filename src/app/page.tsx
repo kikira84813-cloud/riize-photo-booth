@@ -606,14 +606,17 @@ export default function Home() {
     }
 
     try {
-      const [templateImage, maskImage, previewImage, originalImage] = await Promise.all([
-        loadPhotoImage(selectedTemplate.file),
+      const [templateImage, maskImage, editMaskImage, previewImage, originalImage] = await Promise.all([
+        loadPhotoImage(selectedTemplate.exportFile ?? selectedTemplate.file),
+        loadPhotoImage(selectedTemplate.exportMask ?? selectedTemplate.mask),
         loadPhotoImage(selectedTemplate.mask),
         loadPhotoImage(photo),
         loadPhotoImage(exportPhoto ?? photo)
       ]);
       const width = maskImage.naturalWidth || templateImage.naturalWidth;
       const height = maskImage.naturalHeight || templateImage.naturalHeight;
+      const placementScaleX = width / (editMaskImage.naturalWidth || width);
+      const placementScaleY = height / (editMaskImage.naturalHeight || height);
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
@@ -638,10 +641,10 @@ export default function Home() {
 
       photoCtx.drawImage(
         originalImage,
-        placement.x,
-        placement.y,
-        previewImage.naturalWidth * placement.scale,
-        previewImage.naturalHeight * placement.scale
+        placement.x * placementScaleX,
+        placement.y * placementScaleY,
+        previewImage.naturalWidth * placement.scale * placementScaleX,
+        previewImage.naturalHeight * placement.scale * placementScaleY
       );
       if (hasPhotoAdjustments(photoAdjustmentsRef.current)) {
         applyPixelAdjustments(photoCtx, width, height, photoAdjustmentsRef.current);
