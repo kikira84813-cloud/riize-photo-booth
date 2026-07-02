@@ -138,12 +138,12 @@ const slots: Array<PhotoSlot> = [
   { x: 0.1787, y: 0.1145, width: 0.6551, height: 0.7652, mask: "roundedRect" },
   { x: 0.2404, y: 0.4267, width: 0.4291, height: 0.5374, mask: "roundedRect" },
   { x: 0.1106, y: 0.0, width: 0.7769, height: 0.9207, mask: "roundedRect" },
-  { x: 0.1119, y: 0.2193, width: 0.8105, height: 0.6797, mask: "roundedRect" },
-  { x: 0.0645, y: 0.0914, width: 0.8646, height: 0.799, mask: "roundedRect" },
-  { x: 0.1555, y: 0.2774, width: 0.6912, height: 0.5656, mask: "roundedRect" },
+  { x: 0.1087, y: 0.2193, width: 0.8137, height: 0.6802, mask: "roundedRect" },
+  { x: 0.0645, y: 0.0914, width: 0.865, height: 0.799, mask: "roundedRect" },
+  { x: 0.1549, y: 0.2774, width: 0.692, height: 0.5659, mask: "roundedRect" },
   { x: 0.06, y: 0.2547, width: 0.6975, height: 0.5542, mask: "roundedRect" },
-  { x: 0.1094, y: 0.1027, width: 0.7812, height: 0.7959, mask: "roundedRect" },
-  { x: 0.0728, y: 0.0176, width: 0.8377, height: 0.9521, mask: "roundedRect" },
+  { x: 0.1094, y: 0.1027, width: 0.7822, height: 0.7959, mask: "roundedRect" },
+  { x: 0.0728, y: 0.0176, width: 0.8381, height: 0.9521, mask: "roundedRect" },
 ];
 
 export const templates: IdolTemplate[] = templateFiles.map((file, index) => {
